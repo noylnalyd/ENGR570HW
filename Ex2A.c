@@ -14,9 +14,11 @@ int digitCount(int num){
   return count;
 }
 
-int main(int N) {
+int main(int argc, char *argv[]) {
   // Part i
   // N is read as an arg to main!
+  int N;
+  sscanf(argv[1],"%d",&N);
 
   // Part ii
   int i = -1, j = -1, k = -1, ind = -1;
@@ -26,7 +28,7 @@ int main(int N) {
   }
   if (flag == 0) {
     printf("Invalid N.\n");
-    return 1;
+    exit(1);
   }
 
   // Part iii
@@ -44,7 +46,7 @@ int main(int N) {
   }
 
   // Part iv
-  int numSpacesMax = MAX(digitCount(N*N)+1, 3);
+  int numSpacesMax = MAX(digitCount(N*N)+1, 2);
   printf("A=[");
   for (i = 0; i < N; i++) {
     for (j = 0; j < N; j++) {

@@ -7,21 +7,17 @@ PROGRAM Ex2B
     INTEGER,ALLOCATABLE,DIMENSION(:) :: A ! Matrix to fill
     INTEGER(4) :: numSpacesMax,kmax,k
     INTEGER(4),EXTERNAL :: digitCount
-    CHARACTER*1 dig1
-    CHARACTER*2 dig2
-    CHARACTER*3 dig3
 
     ! Part i
     CHARACTER*100 buffer
     CALL GETARG(1,buffer)
     READ(buffer,*) N
     ! READ(*,*) N ! Read in N
-    WRITE(*,*) N
 
     ! Part ii
     IF ( (N/=2) .and. (N/=4) .and. (N/=8) .and. (N/=16) ) THEN
         WRITE(*,*) "Invalid N."
-        STOP
+        STOP 1
     END IF
     
     ! Part iii
