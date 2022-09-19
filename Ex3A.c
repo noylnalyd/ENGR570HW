@@ -1,5 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+
+
 int main(int argc, char *argv[]) {
   // Part i
   // N is read as an arg to main!
@@ -16,6 +18,6 @@ int main(int argc, char *argv[]) {
     printf("Invalid N.\n");
     exit(1);
   }
-  Ex3A(N);
+  Ex3A(&N);
   return 0;
 }

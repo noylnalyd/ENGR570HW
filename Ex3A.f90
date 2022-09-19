@@ -3,7 +3,7 @@ SUBROUTINE Ex3A(N) BIND (C,name='Ex3A')
         IMPLICIT NONE
 
         
-        INTEGER(C_INT),INTENT(IN),VALUE :: N
+        INTEGER(C_INT),INTENT(IN) :: N
         INTEGER(4) :: i,j,ind ! Indices
     INTEGER,ALLOCATABLE,DIMENSION(:) :: A ! Matrix to fill
     INTEGER(4) :: numSpacesMax,kmax,k
