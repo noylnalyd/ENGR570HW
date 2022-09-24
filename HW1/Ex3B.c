@@ -13,10 +13,12 @@ int digitCount(int num){
   return count;
 }
 
-void Ex3B(int N){
+void Ex3Blol(int N){
     // Part ii
   int i = -1, j = -1, k = -1, ind = -1;
 
+
+  
   // Part iii
   int *A = (int *)malloc(N * N * sizeof(int));
   for (i = 0; i < N * N; i++) {

@@ -3,14 +3,14 @@ SUBROUTINE Ex3A(N) BIND (C,name='Ex3A')
         IMPLICIT NONE
 
         
-        INTEGER(C_INT),INTENT(IN),VALUE :: N
+        INTEGER(C_INT),INTENT(IN) :: N
         INTEGER(4) :: i,j,ind ! Indices
     INTEGER,ALLOCATABLE,DIMENSION(:) :: A ! Matrix to fill
     INTEGER(4) :: numSpacesMax,kmax,k
     INTEGER(4),EXTERNAL :: digitCount
     ! Part iii
-    ALLOCATE(A(N*N))
-    DO i=0,N*N-1
+    ALLOCATE(A(0:N*N))
+    DO i=0,(N*N-1)
         ind = 0
         DO j=0,N-1
             IF(IAND(j,1) .gt. 0) THEN
