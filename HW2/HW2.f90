@@ -31,8 +31,7 @@ PROGRAM HW2
     CHARACTER(7) :: mmfield
     CHARACTER(19) :: mmsymm
 
-    ! Set mmread inputs
-    input_unit = 1
+    
 
     ! Output variables
     REAL(8),ALLOCATABLE,DIMENSION(:) :: b ! Vector output
@@ -40,6 +39,9 @@ PROGRAM HW2
 
     ! Read input
     CHARACTER(100) :: buffer
+    
+    ! Set mmread inputs
+    input_unit = 1
 
     CALL GETARG(1,buffer)
     READ(buffer,*) spfmt
