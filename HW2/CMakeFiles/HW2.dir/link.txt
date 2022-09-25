@@ -1,0 +1,1 @@
+/usr/bin/f95    CMakeFiles/HW2.dir/HW2.f90.o CMakeFiles/HW2.dir/mm_io.f90.o  -o HW2 
