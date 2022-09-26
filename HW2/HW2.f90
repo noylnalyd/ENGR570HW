@@ -67,7 +67,7 @@ PROGRAM HW2
     ALLOCATE(x(ncol))
     ALLOCATE(b(nrow))
 
-    ! Loop????
+    ! Loop???? bad idaeasasassasa
 
     ! Switch case for spfmt
     SELECT CASE (spfmt)
