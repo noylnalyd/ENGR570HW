@@ -384,8 +384,10 @@ subroutine mm_file_read ( input_unit, id, type, rep, field, symm, nrow, &
     write ( *, '(a)' ) ' '
     write ( *, '(a)' ) 'MM_FILE_READ - Fatal error!'
     write ( *, '(a)' ) '  Insufficient memory to read matrix.'
-    write ( *, '(a)' ) '  Number of entries to be read = ', nnz
-    write ( *, '(a)' ) '  Number of entries supplied = ',nnzmax
+    write ( *, '(a)' ) '  Number of entries to be read = '
+    
+    write ( *, '(a)' ) '  Number of entries supplied = '
+    write ( *, * ) nnzmax
     stop 1
   end if
 !
@@ -1659,6 +1661,7 @@ subroutine mm_values_read ( input_unit, rep, field, nnz, indx, jndx, &
   character ( len = 10 ) rep
   real ( kind = 4 ) rval(nnz)
   logical s_eqi
+
 
   if ( s_eqi ( rep, 'coordinate' ) ) then
 
