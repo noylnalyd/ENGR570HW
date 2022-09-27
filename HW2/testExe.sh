@@ -2,4 +2,4 @@
 cmake ./
 make
 
-./SpMV.exe DEN 1 lns_3937.mtx ex3937IN.txt ex3937OUT.txt
+./SpMV.exe COO 2 lns_3937.mtx ex3937IN.txt ex3937OUT.txt
