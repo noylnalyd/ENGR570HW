@@ -1,1 +1,0 @@
-/usr/bin/f95    CMakeFiles/SpMV.exe.dir/HW2.f90.o CMakeFiles/SpMV.exe.dir/mm_io.f90.o  -o SpMV.exe 

@@ -344,7 +344,6 @@ PROGRAM HW2
                 end do
             END DO
         END DO
-        WRITE(*,*) inz
         call cpu_time(stop);
         if (verbose>1) then
             WRITE(*,*) (stop-start)/REAL(nmults);
