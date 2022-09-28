@@ -1117,7 +1117,7 @@ subroutine mm_size_print ( input_file, rep, symm, nrow, ncol, nnz )
   integer ( kind = 4 ) nrow
   character ( len = 10 ) rep
   logical s_eqi
-  character ( len = 17 ) symm
+  character ( len = 19 ) symm
 
   write ( *, '(a)' ) ' '
   write ( *, '(a)' ) 'MM_SIZE_PRINT:'

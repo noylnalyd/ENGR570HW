@@ -1,7 +1,10 @@
 import random
-f = open("ex3937IN.txt","w")
+import sys
 
-n = 3937
+filePrefix = sys.argv[1]
+f = open(filePrefix+"IN.txt","w")
+
+n = int(sys.argv[2])
 max_val = 1000.0
 a = [0.0]*n
 random.seed()
