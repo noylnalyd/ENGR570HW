@@ -113,6 +113,9 @@ PROGRAM HW2
     ival, rval, dval, cval )
     ! CALL mm_file_read(mm_in, mmid, mmtype, mmrep, mmfield, mmsymm, nrow, ncol, nnz, nnzmax, indx, jndx, ival, rval, dval, cval)
     
+    if (NNZMAX /= nnz) then
+        WRITE(*,*) "NNZ /= nnz"
+    end if
     if (verbose > 3) then
         WRITE(*,*) "Read mm."
     end if
@@ -121,16 +124,15 @@ PROGRAM HW2
     ALLOCATE(b(0:(nrow-1)))
 
     ! Read in x, the vector to multiply
-    
     do i=0,ncol-1
         READ(vec_in,*) x(i)
     end do
 
+    
     if (verbose > 3) then
         WRITE(*,*) "Read x."
     end if
     ! Loop????
-
 
     ! Switch case for spfmt
     SELECT CASE (spfmt)
@@ -140,6 +142,11 @@ PROGRAM HW2
             WRITE(*,*) "Dense matrix conversion"
         end if
         ALLOCATE(A(0:(nrow-1),0:(ncol-1)))
+        DO j=0,ncol-1
+            DO i=0,nrow-1
+                A(i,j)=0;
+            END DO
+        END DO
         DO inz=0,nnz-1
             A(indx(inz),jndx(inz)) = DBLE(rval(inz))
         END DO
@@ -178,6 +185,12 @@ PROGRAM HW2
                 b(i) = 0;
             END DO
             DO inz=0,nnz-1
+                if(indx(inz) .ge. nrow)then
+                    !WRITE(*,*) "row too big"
+                end if
+                if(jndx(inz) .ge. ncol)then
+                    !WRITE(*,*) "col too big"
+                end if
                 b(indx(inz)) = b(indx(inz)) + DBLE(rval(inz)) * x(jndx(inz));
             END DO
         END DO

@@ -5,13 +5,18 @@ solution = sys.argv[2]
 vo = open(vecFileOut,"r")
 so = open(solution,"r")
 
-for x in vo:
+while True:
+    x = vo.readline()
     y = so.readline()
-    if abs(float(x)-float(y)) > 1e-4:
-        print("Not a good match.")
+    if x=="" or y=="":
+        break
+    if abs(float(x)-float(y))/max(abs(float(x)),abs(float(y))) > 1e-4:
+        print("Vectors are not equal")
+        print(x)
+        print(y)
         quit()
 
-print("A good match.")
+print("Vectors are equal")
 
 vo.close()
 so.close()
