@@ -10,7 +10,7 @@ for matrix in {0..4}; do
     filePrefix=${filePrefixes[$matrix]}
     # python3 makeVecFile.py $filePrefix $n
     echo $filePrefix
-    for SpFmt in "COO" "DEN" "CSR" #"JDS" "DEN" "COO" "CSR" "ELL"
+    for SpFmt in "JDS" "ELL" #"JDS" "DEN" "COO" "CSR" "ELL"
     do
         echo $SpFmt
         ./SpMV.exe ${SpFmt} 10 ${filePrefix}.mtx ${filePrefix}IN.txt ${filePrefix}${SpFmt}OUT.txt

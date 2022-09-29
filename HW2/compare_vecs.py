@@ -10,7 +10,7 @@ while True:
     y = so.readline()
     if x=="" or y=="":
         break
-    if abs(float(x)-float(y))/max(abs(float(x)),abs(float(y))) > 1e-4:
+    if abs(float(x)-float(y))/max(abs(float(x)),abs(float(y))) > 1e-2:
         print("Vectors are not equal")
         print(x)
         print(y)

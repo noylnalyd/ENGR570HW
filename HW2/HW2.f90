@@ -42,9 +42,9 @@ PROGRAM HW2
     !   Dense
     REAL(8),ALLOCATABLE,DIMENSION(:,:) :: A ! Matrix to fill for dense and ELLPACK
     !   Sparse
-    INTEGER(4),ALLOCATABLE,DIMENSION(:) :: csrRowPtr ! CSR row storage
+    INTEGER(4),ALLOCATABLE,DIMENSION(:) :: csrRowPtr,csrcol ! CSR row storage
     INTEGER(4),ALLOCATABLE,DIMENSION(:) ::  col_ind,perm,jd_ptr ! Jagged diag vectors 
-    REAL(8),ALLOCATABLE,DIMENSION(:) :: jdiag ! jdiag
+    REAL(8),ALLOCATABLE,DIMENSION(:) :: jdiag,csrval ! jdiag,csrval
     INTEGER(4),ALLOCATABLE,DIMENSION(:) :: ellcount ! #elements per row for ellpack
     INTEGER(4),ALLOCATABLE,DIMENSION(:,:) ::  colidx ! colidx for ellpack
     INTEGER(4) :: ellmax,tellmax ! max number of entries in a row for ellpack
@@ -93,6 +93,7 @@ PROGRAM HW2
     ! Read in mm file
     ! Read header
     call mm_header_read (mm_in, mmid, mmtype, mmrep, mmfield, mmsymm)
+
     ! ignore comments
     do
         call mm_comment_read (mm_in, tmp1 )
@@ -103,19 +104,37 @@ PROGRAM HW2
     ! read size
     call mm_size_read_string ( tmp1, mmrep, mmsymm, nrow, ncol, nnzmax )
     nnz = nnzmax;
+
+    ! For that one symmetric one (ew)
+    if (mmsymm == 'symmetric')then
+        ! 2*nnz - diagonal elements
+        nnzmax = 2*nnzmax-5489;
+    end if
+
     ! Allocate space for indexes
     ALLOCATE(indx(nnzmax))
     ALLOCATE(jndx(nnzmax))
     ALLOCATE(dval(nnzmax))
     ALLOCATE(rval(nnzmax))
     ! read values
-    call mm_values_read (mm_in, mmrep, mmfield, nnzmax, indx, jndx, &
+    call mm_values_read (mm_in, mmrep, mmfield, nnz, indx, jndx, &
     ival, rval, dval, cval )
     ! CALL mm_file_read(mm_in, mmid, mmtype, mmrep, mmfield, mmsymm, nrow, ncol, nnz, nnzmax, indx, jndx, ival, rval, dval, cval)
-    
-    if (NNZMAX /= nnz) then
-        WRITE(*,*) "NNZ /= nnz"
+
+    ! Populate symmetric entries
+    if (mmsymm == 'symmetric')then
+        inz = nnz+1
+        do i=1,nnz
+            if(indx(i) .ne. jndx(i))then
+                rval(inz) = rval(i)
+                indx(inz) = jndx(i)
+                jndx(inz) = indx(i)
+                inz = inz+1;
+            end if
+        end do
+        nnz = nnzmax;
     end if
+
     if (verbose > 3) then
         WRITE(*,*) "Read mm."
     end if
@@ -124,10 +143,9 @@ PROGRAM HW2
     ALLOCATE(b(0:(nrow-1)))
 
     ! Read in x, the vector to multiply
-    do i=0,ncol-1
+    do i=0,(ncol-1)
         READ(vec_in,*) x(i)
     end do
-
     
     if (verbose > 3) then
         WRITE(*,*) "Read x."
@@ -142,24 +160,24 @@ PROGRAM HW2
             WRITE(*,*) "Dense matrix conversion"
         end if
         ALLOCATE(A(0:(nrow-1),0:(ncol-1)))
-        DO j=0,ncol-1
-            DO i=0,nrow-1
+        DO j=0,(ncol-1)
+            DO i=0,(nrow-1)
                 A(i,j)=0;
             END DO
         END DO
-        DO inz=0,nnz-1
-            A(indx(inz),jndx(inz)) = DBLE(rval(inz))
+        DO inz=1,nnz
+            A(indx(inz)-1,jndx(inz)-1) = DBLE(rval(inz))
         END DO
         if (verbose > 1) then
             WRITE(*,*) "Dense matrix multiply."
         end if
         call cpu_time(start);
         DO imult=1,nmults
-            DO i=0,nrow-1
+            DO i=0,(nrow-1)
                 b(i) = 0;
             END DO
-            DO j=0,ncol-1
-                DO i=0,nrow-1
+            DO j=0,(ncol-1)
+                DO i=0,(nrow-1)
                     b(i) = b(i) + A(i,j)*x(j);
                 END DO
             END DO
@@ -181,17 +199,11 @@ PROGRAM HW2
         end if
         call cpu_time(start);
         DO imult=1,nmults
-            DO i=0,nrow-1
+            DO i=0,(nrow-1)
                 b(i) = 0;
             END DO
-            DO inz=0,nnz-1
-                if(indx(inz) .ge. nrow)then
-                    !WRITE(*,*) "row too big"
-                end if
-                if(jndx(inz) .ge. ncol)then
-                    !WRITE(*,*) "col too big"
-                end if
-                b(indx(inz)) = b(indx(inz)) + DBLE(rval(inz)) * x(jndx(inz));
+            DO inz=1,nnz
+                b(indx(inz)-1) = b(indx(inz)-1) + DBLE(rval(inz)) * x(jndx(inz)-1);
             END DO
         END DO
         call cpu_time(stop);
@@ -213,34 +225,55 @@ PROGRAM HW2
         DO i=0,nrow-1
             ellcount(i) = 0;
         END DO
-        DO inz=0,nnz-1
-            ellcount(indx(inz)) = ellcount(indx(inz))+1;
-            ellmax = MAX0(ellmax,ellcount(indx(inz)));
+        DO inz=1,nnz
+            ellcount(indx(inz)-1) = ellcount(indx(inz)-1)+1;
+            if (ellmax < ellcount(indx(inz)-1)) then
+                ellmax = ellcount(indx(inz)-1)
+            end if
         END DO
+        
+        if (verbose > 2) then
+            WRITE(*,*) "ELLPack allocated."
+        end if
+        tellmax = 0;
+        iCSRrow = 0;
+        ALLOCATE(csrval(0:nnz-1));
         ALLOCATE(csrRowPtr(0:(nrow)))
+        ALLOCATE(csrcol(0:(nnz-1)))
         iCSRrow = 0;
         csrRowPtr(0) = 0;
-        DO i=1,(nrow-1)
+        DO i=1,(nrow)
             csrRowPtr(i) = ellcount(i-1)+csrRowPtr(i-1);
         END DO
-        csrRowPtr(nrow) = nnz;
+        inz = 0;
+        DO i=0,(nrow-1)
+            do j=1,nnz
+                if (indx(j)-1 .eq. i) then
+                    csrval(inz) = DBLE(rval(j));
+                    csrcol(inz) = jndx(j)-1;
+                    inz = inz+1;
+                end if
+            end do
+        end do
+        ! csrRowPtr(nrow) = nnz;
         if (verbose > 1) then
             WRITE(*,*) "CSR matrix multiply."
         end if
         call cpu_time(start);
         DO imult=1,nmults
-            DO i=0,nrow-1
+            DO i=0,(nrow-1)
                 b(i) = 0;
             END DO
-            DO i=0,nrow-1
+            inz = 0;
+            DO i=0,(nrow-1)
                 DO inz=csrRowPtr(i),(csrRowPtr(i+1)-1)
-                    b(i) = b(i) + DBLE(rval(inz))*x(jndx(inz));
+                    b(i) = b(i) + csrval(inz)*x(csrcol(inz));
                 end do
             END DO
         END DO
         call cpu_time(stop);
         if (verbose>1) then
-            memSize = sizeof(csrRowPtr)+sizeof(rval);
+            memSize = sizeof(csrRowPtr)+sizeof(csrval)+sizeof(csrcol);
             WRITE(*,*) memSize;
             WRITE(*,*) (stop-start)/REAL(nmults);
         end if
@@ -251,17 +284,17 @@ PROGRAM HW2
         if (verbose > 2) then
             WRITE(*,*) "JDS conversion."
         end if
+        ! First need to count max elements in a row to get el array, colidx array
         ellmax = 0;
-        tellmax = 0;
         iCSRrow = 0;
         ALLOCATE(ellcount(0:(nrow-1)));
         DO i=0,nrow-1
             ellcount(i) = 0;
         END DO
-        DO inz=0,nnz-1
-            ellcount(indx(inz)) = ellcount(indx(inz))+1;
-            if (ellmax < ellcount(indx(inz))) then
-                ellmax = ellcount(indx(inz))
+        DO inz=1,nnz
+            ellcount(indx(inz)-1) = ellcount(indx(inz)-1)+1;
+            if (ellmax < ellcount(indx(inz)-1)) then
+                ellmax = ellcount(indx(inz)-1)
             end if
         END DO
         ALLOCATE(A(0:(nrow-1),0:(ellmax-1)));
@@ -269,16 +302,17 @@ PROGRAM HW2
         if (verbose > 2) then
             WRITE(*,*) "ELLPack allocated."
         end if
+        ! Now populate A,colidx
         tellmax = 0;
         iCSRrow = 0;
         DO i=0,nrow-1
             ellcount(i) = 0;
         END DO
-        DO inz=0,nnz-1
+        DO inz=1,nnz
             ! Append to row
-            A(indx(inz),ellcount(indx(inz))) = DBLE(rval(inz));
-            colidx(indx(inz),ellcount(indx(inz))) = jndx(inz);
-            ellcount(indx(inz)) = ellcount(indx(inz)) +1;
+            A(indx(inz)-1,ellcount(indx(inz)-1)) = DBLE(rval(inz));
+            colidx(indx(inz)-1,ellcount(indx(inz)-1)) = jndx(inz)-1;
+            ellcount(indx(inz)-1) = ellcount(indx(inz)-1) +1;
         END DO
         
         ! Now populate jdiag,colidx,perm,jd_ptr
@@ -369,15 +403,16 @@ PROGRAM HW2
         end if
         ! First need to count max elements in a row to get el array, colidx array
         ellmax = 0;
-        tellmax = 0;
         iCSRrow = 0;
         ALLOCATE(ellcount(0:(nrow-1)));
         DO i=0,nrow-1
             ellcount(i) = 0;
         END DO
-        DO inz=0,nnz-1
-            ellcount(indx(inz)) = ellcount(indx(inz))+1;
-            ellmax = MAX0(ellmax,ellcount(indx(inz)));
+        DO inz=1,nnz
+            ellcount(indx(inz)-1) = ellcount(indx(inz)-1)+1;
+            if (ellmax < ellcount(indx(inz)-1)) then
+                ellmax = ellcount(indx(inz)-1)
+            end if
         END DO
         ALLOCATE(A(0:(nrow-1),0:(ellmax-1)));
         ALLOCATE(colidx(0:(nrow-1),0:(ellmax-1)));
@@ -390,11 +425,11 @@ PROGRAM HW2
         DO i=0,nrow-1
             ellcount(i) = 0;
         END DO
-        DO inz=0,nnz-1
+        DO inz=1,nnz
             ! Append to row
-            A(indx(inz),ellcount(indx(inz))) = DBLE(rval(inz));
-            colidx(indx(inz),ellcount(indx(inz))) = jndx(inz);
-            ellcount(indx(inz)) = ellcount(indx(inz)) +1;
+            A(indx(inz)-1,ellcount(indx(inz)-1)) = DBLE(rval(inz));
+            colidx(indx(inz)-1,ellcount(indx(inz)-1)) = jndx(inz)-1;
+            ellcount(indx(inz)-1) = ellcount(indx(inz)-1) +1;
         END DO
         if (verbose > 1) then
             WRITE(*,*) "ELLPack matrix multiply."

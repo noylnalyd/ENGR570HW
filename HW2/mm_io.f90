@@ -1671,7 +1671,7 @@ subroutine mm_values_read ( input_unit, rep, field, nnz, indx, jndx, &
         if ( ios /= 0 ) then
           write ( *, '(a)' ) ' '
           write ( *, '(a)' ) 'MM_VALUES_READ - Fatal error!'
-          write ( *, '(a)' ) '  Error or end of file on value field ', i
+          write ( *, * ) '  Error or end of file on value field ', i
           stop 1
         end if
       end do
@@ -1681,7 +1681,7 @@ subroutine mm_values_read ( input_unit, rep, field, nnz, indx, jndx, &
         if ( ios /= 0 ) then
           write ( *, '(a)' ) ' '
           write ( *, '(a)' ) 'MM_VALUES_READ - Fatal error!'
-          write ( *, '(a)' ) '  Error or end of file on value field ', i
+          write ( *, * ) '  Error or end of file on value field ', i
           stop 1
         end if
       end do
