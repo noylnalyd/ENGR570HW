@@ -11,6 +11,9 @@ int main(int argc, char const *argv[])
     // Scoping unit
     {
         SpMV::SparseMatrix A = SpMV::SparseMatrix(3,4);
+        A.assembleStorage();
+        A.setCoefficient(2,3,4.2);
+        SpMV::SparseMatrix tmp = A.getFormat();
     }
 
     delete(ptr_A);

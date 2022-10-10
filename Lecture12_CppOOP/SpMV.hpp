@@ -19,6 +19,10 @@ protected:
 public:
     SparseMatrix(std::size_t nrows, std::size_t ncols);
     ~SparseMatrix();
+
+    void setCoefficient(const size_t rowIdx, const size_t colIdx, const double Aij);
+    void assembleStorage();
+    SparseMatrix getFormat();
 };
 
 SparseMatrix::SparseMatrix(const size_t nrows,const std::size_t ncols) : 
@@ -33,4 +37,18 @@ SparseMatrix::SparseMatrix(const size_t nrows,const std::size_t ncols) :
 SparseMatrix::~SparseMatrix(/*args*/){
     std::cout << "Destoryah!" << std::endl;
 }
+void SparseMatrix::setCoefficient(const size_t rowIdx, const size_t colIdx, const double Aij){
+    cout << "howdy u set a variable <3" << endl;
+}
+void SparseMatrix::assembleStorage(){
+    cout << "assemblin the storage toady?" << endl;
+}
+
+SparseMatrix SparseMatrix::getFormat(){
+    cout << "look! a wild format!" << endl;
+    return SparseMatrix(this->_ncols,this->_nrows);
+}
+
+
+
 };
