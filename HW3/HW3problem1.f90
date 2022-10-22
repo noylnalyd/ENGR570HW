@@ -7,17 +7,16 @@ PROGRAM HW3problem1
     IMPLICIT NONE
 
     ! Variable declarations
-    INTEGER(4) :: i,j,inz ! Indices
+    INTEGER(4) :: i,j,k,inz ! Indices
     INTEGER(4) :: verbose ! Verbose control.
+    REAL(8) :: comp, tmpcomp ! Working computation values
     REAL :: start, stop ! timing record
-    INTEGER(8) :: memSize ! Total size of stored matrix.
 
     ! Command args
-    CHARACTER(len = 10) :: spfmt ! Sparse format (DEN here)
     CHARACTER(len = 100) :: mmfile ! mm address
 
     ! mm read variables
-    INTEGER(4) :: mm_in,mm_out,nrow,ncol,nnz,nnzmax
+    INTEGER(4) :: mm_in,nrow,ncol,nnz,nnzmax
     INTEGER(4),ALLOCATABLE,DIMENSION(:) :: indx,jndx
     INTEGER(4),ALLOCATABLE,DIMENSION(:) :: ival
     REAL(4),ALLOCATABLE,DIMENSION(:) :: rval
@@ -37,6 +36,7 @@ PROGRAM HW3problem1
     !   Dense
     REAL(8),ALLOCATABLE,DIMENSION(:,:) :: A ! Matrix to fill for dense
     REAL(8),ALLOCATABLE,DIMENSION(:,:) :: Q,R ! Q and R factors of A
+    REAL(8),ALLOCATABLE,DIMENSION(:,:) :: calc ! Matrix for norm compuations
 
     ! Input buffer
     CHARACTER(100) :: buffer
@@ -161,20 +161,82 @@ PROGRAM HW3problem1
         END DO
     END DO
 
-    ! Orthogonalize, 1 column at a time
+    ! Orthonormalize, 1 column at a time
     DO j=0,(ncol-1)
         ! r_jj = L2 norm of q_:j column
         DO i=0,(nrow-1)
-            R(j,j) = R(j,j) + Q(i,j)*Q(i,j)
+            R(j,j) = R(j,j) + Q(i,j)**2
         END DO
         R(j,j) = DSQRT(R(j,j))
 
+        ! Normalize q_:j by r_jj
+        DO i=0,(nrow-1)
+            Q(i,j) = Q(i,j)/R(j,j)
+        END DO
 
+        ! Orthogonalize further q_:k by q_:j
+        DO k=(j+1),(ncol-1)
+            ! r_jk = (q_:j)' * q_:k
+            DO i=0,(nrow-1)
+                R(j,k) = R(j,k) + Q(i,j)*Q(i,k)
+            END DO
+            ! q_:k = q_:k - r_jk * q_:j
+            DO i=0,(nrow-1)
+                Q(i,k) = Q(i,k) - R(j,k) * Q(i,j)
+            END DO
+        END DO
+    END DO
 
+    if (verbose > 1) then
+        WRITE(*,*) "Q,R calculated"
+    end if
 
+    ! Compute desired outputs (the norms)
+    ALLOCATE(calc(0:(nrow-1),0:(ncol-1)))
+    DO j=0,(ncol-1)
+        DO i=0,(nrow-1)
+            Q(i,j)=0;
+            R(i,j)=0;
+        END DO
+    END DO
+    if (verbose > 3) then
+        WRITE(*,*) "calc allocated"
+    end if
 
+    ! First, compute trace only of Q^T * Q
+    ! Q^T * Q = sum Q(i,:)' * Q(:,j) = sum Q(:,i) * Q(:,j)
+    ! So trace is sum Q(:,i)*Q(:,i) aka sumsq of column i!
+    comp = 0
+    DO i=0,(ncol-1)
+        ! compute sum Q(:,i)*Q(:,i)
+        tmpcomp = 0
+        DO k=0,(nrow-1)
+            tmpcomp = tmpcomp + Q(k,i)**2
+        END DO
+        ! Add error from 1 to comp
+        comp = comp + (1-tmpcomp)**2
+    END DO
+    comp = DSQRT(comp)
+    WRITE(*,'(A,E10.5)') "||I-Q^T Q||_2=", comp
 
+    ! Second we actually have to compute QR using calc matrix
+    DO i=0,(nrow-1)
+        DO k=0,(ncol-1)
+            DO j=k,(ncol-1)
+                calc(i,j) = calc(i,j) + Q(i,k)*R(k,j)
+            END DO
+        END DO
+    END DO
 
+    ! Now compute frobenius norm
+    comp = 0
+    DO i=0,(nrow-1)
+        DO j=0,(ncol-1)
+            comp = comp + (A(i,j)-calc(i,j))**2
+        END DO
+    END DO
+    comp = DSQRT(comp)
+    WRITE(*,'(A,E10.5)') "||A-QR||_2", comp
 
     ! Write to mtx files
 
