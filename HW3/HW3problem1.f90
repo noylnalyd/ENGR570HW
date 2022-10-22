@@ -49,8 +49,8 @@ PROGRAM HW3problem1
     end if
 
     ! Read input
-    READ(buffer,*) mmfile
     CALL GETARG(1,buffer)
+    READ(buffer,*) mmfile
     
     if (verbose > 3) then
         WRITE(*,*) "Read inputs."
@@ -60,7 +60,7 @@ PROGRAM HW3problem1
     mm_in = 1
     q_out = 2
     r_out = 3
-    
+    WRITE(*,*) mmfile
     ! Open units
     OPEN(mm_in,FILE=mmfile)
     OPEN(q_out,FILE="q.mtx")
@@ -217,7 +217,7 @@ PROGRAM HW3problem1
         comp = comp + (1-tmpcomp)**2
     END DO
     comp = DSQRT(comp)
-    WRITE(*,'(A,E10.5)') "||I-Q^T Q||_2=", comp
+    WRITE(*,'(A,E20.5)') "||I-Q^T Q||_2=", comp
 
     ! Second we actually have to compute QR using calc matrix
     DO i=0,(nrow-1)
@@ -236,7 +236,7 @@ PROGRAM HW3problem1
         END DO
     END DO
     comp = DSQRT(comp)
-    WRITE(*,'(A,E10.5)') "||A-QR||_2", comp
+    WRITE(*,'(A,E20.5)') "||A-QR||_2=", comp
 
     ! Write to mtx files
 
