@@ -55,7 +55,7 @@ PROGRAM HW2
     CHARACTER(100) :: buffer
 
     ! Set verbose
-    verbose = 0;
+    verbose = 3;
 
     if (verbose > 3) then
         WRITE(*,*) "Allocated data."
@@ -393,6 +393,7 @@ PROGRAM HW2
         END DO
         call cpu_time(stop);
         if (verbose>1) then
+            WRITE(*,*) sizeof(perm) + sizeof(jdiag) + sizeof(col_ind) + sizeof(jd_ptr);
             WRITE(*,*) (stop-start)/REAL(nmults);
         end if
     ! ELLPACK, whatever that means
@@ -447,7 +448,7 @@ PROGRAM HW2
         END DO
         call cpu_time(stop);
         if (verbose>1) then
-            memSize = sizeof(ellcount)+sizeof(colidx);
+            memSize = sizeof(ellcount)+sizeof(colidx) + sizeof(A);
             WRITE(*,*) memSize
             WRITE(*,*) (stop-start)/REAL(nmults);
         end if
