@@ -11,6 +11,7 @@ PROGRAM HW3problem1
     INTEGER(4) :: verbose ! Verbose control.
     REAL(8) :: comp, tmpcomp ! Working computation values
     REAL :: start, stop ! timing record
+    INTEGER(4) :: nulli(1) ! Some preposterous null integer
 
     ! Command args
     CHARACTER(len = 100) :: mmfile ! mm address
@@ -165,10 +166,13 @@ PROGRAM HW3problem1
     DO j=0,(ncol-1)
         ! r_jj = L2 norm of q_:j column
         DO i=0,(nrow-1)
-            R(j,j) = R(j,j) + Q(i,j)**2
+            R(j,j) = R(j,j) + (Q(i,j)*Q(i,j))
         END DO
         R(j,j) = DSQRT(R(j,j))
 
+        IF (R(j,j) .lt. 1e-5) then
+            WRITE(*,*) "Ill conditiond!!!"
+        end if
         ! Normalize q_:j by r_jj
         DO i=0,(nrow-1)
             Q(i,j) = Q(i,j)/R(j,j)
@@ -239,7 +243,10 @@ PROGRAM HW3problem1
     WRITE(*,'(A,E20.5)') "||A-QR||_2=", comp
 
     ! Write to mtx files
-
+    CALL mmwrite(q_out,'array','real','general',nrow,ncol,nrow*ncol, &
+        nulli,nulli,nulli,Q,nulli)
+    CALL mmwrite(r_out,'array','real','general',nrow,ncol,nrow*ncol, &
+        nulli,nulli,nulli,R,nulli)
 
 
     ! Close files
