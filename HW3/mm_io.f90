@@ -604,7 +604,7 @@ function mm_header_check ( id, type, rep, field, symm )
   logical s_neqi
   character ( len = * ) symm
   character ( len = 6 ) type
-!
+  !
 !  Test the input qualifiers.
 !
   if ( s_neqi ( id, '%%MatrixMarket' ) ) then
@@ -662,7 +662,7 @@ function mm_header_check ( id, type, rep, field, symm )
     end if
 
   else if ( s_eqi ( rep, 'array' ) ) then
-
+    
     if ( &
       s_neqi ( field, 'integer' ) .and. &
       s_neqi ( field, 'real'    ) .and. &

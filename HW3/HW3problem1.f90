@@ -28,6 +28,7 @@ PROGRAM HW3problem1
     CHARACTER(10) :: mmrep
     CHARACTER(7) :: mmfield
     CHARACTER(19) :: mmsymm
+    character ( len = 7 ) :: outfield = 'double'
     character ( len = 1024 ) tmp1
 
     ! File input variables
@@ -170,9 +171,9 @@ PROGRAM HW3problem1
         END DO
         R(j,j) = DSQRT(R(j,j))
 
-        IF (R(j,j) .lt. 1e-5) then
-            WRITE(*,*) "Ill conditiond!!!"
-        end if
+        !IF (R(j,j) .lt. 1e-5) then
+        !    WRITE(*,*) "Ill conditiond!!!"
+        !end if
         ! Normalize q_:j by r_jj
         DO i=0,(nrow-1)
             Q(i,j) = Q(i,j)/R(j,j)
@@ -199,8 +200,7 @@ PROGRAM HW3problem1
     ALLOCATE(calc(0:(nrow-1),0:(ncol-1)))
     DO j=0,(ncol-1)
         DO i=0,(nrow-1)
-            Q(i,j)=0;
-            R(i,j)=0;
+            calc(i,j) = 0;
         END DO
     END DO
     if (verbose > 3) then
@@ -243,10 +243,20 @@ PROGRAM HW3problem1
     WRITE(*,'(A,E20.5)') "||A-QR||_2=", comp
 
     ! Write to mtx files
-    CALL mmwrite(q_out,'array','real','general',nrow,ncol,nrow*ncol, &
-        nulli,nulli,nulli,Q,nulli)
-    CALL mmwrite(r_out,'array','real','general',nrow,ncol,nrow*ncol, &
-        nulli,nulli,nulli,R,nulli)
+    !  output_unit, id, type, rep, field, symm, nrow, &
+    !   ncol, nnz, indx, jndx, ival, rval, dval, cval
+    ! (mm_in, mmid, mmtype, mmrep, mmfield, mmsymm)
+    
+    mmid = '%%MatrixMarket'
+    mmtype = 'matrix'
+    mmrep = 'array'
+    mmsymm = 'general'
+
+    CALL mm_file_write(q_out, mmid, mmtype, mmrep, outfield, mmsymm,nrow,ncol,nrow*ncol, &
+        nulli,nulli,nulli,nulli,Q,nulli)
+
+    CALL mm_file_write(r_out, mmid, mmtype, mmrep, outfield, mmsymm,nrow,ncol,nrow*ncol, &
+        nulli,nulli,nulli,nulli,R,nulli)
 
 
     ! Close files
