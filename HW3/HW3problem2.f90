@@ -1,10 +1,125 @@
-PROGRAM HW3problem1
+module subs
+    IMPLICIT NONE
+    contains
+INTEGER(8) function indexer(i,j,n)
+    IMPLICIT NONE
+    INTEGER(8), INTENT(IN) :: i,j,n
+    indexer = i*n+j
+end function indexer
+function deindexer(index,n)
+    INTEGER(8), INTENT(IN) :: index,n
+    INTEGER(8), DIMENSION(:), ALLOCATABLE :: deindexer
+    ALLOCATE(deindexer(0:1));
+    deindexer(1) = index/n
+    deindexer(2) = MOD(index,n)
+
+end function deindexer
+
+REAL(8) function LaplaceEqn(u,u_0,u_1,u_2,u_3)
+    REAL(8), INTENT(IN) :: u,u_0,u_1,u_2,u_3
+    LaplaceEqn = (u_0+u_1+u_2+u_3-4*u)
+end function LaplaceEqn
+
+REAL(8) function updater(u,u_0,u_1,u_2,u_3)
+    REAL(8), INTENT(IN) :: u,u_0,u_1,u_2,u_3
+    updater = (u_0+u_1+u_2+u_3-3*u)
+end function updater
+
+REAL(8) function laplaceEval(i,j,u,n)
+    REAL(8), INTENT(IN), DIMENSION(:) :: u
+    INTEGER(8), INTENT(IN) :: i,j,n
+    !INTEGER(8), EXTERNAL :: indexer
+    !REAL(8), EXTERNAL :: LaplaceEqn
+    REAL(8) :: U0,u_0,u_1,u_2,u_3
+    laplaceEval = 0
+    U0 = u(indexer(i,j,n))
+    u_0 = 0
+    u_1 = 0
+    u_2 = 0
+    u_3 = 0
+    IF (i>0) then
+        u_2 = u(indexer(i-1,j,n))
+    END IF
+    IF (i<(n-1)) then
+        u_0 = u(indexer(i+1,j,n))
+    END IF
+    IF (j>0) then
+        u_1 = u(indexer(i,j-1,n))
+    END IF
+    IF (j<(n-1)) then
+        u_3 = u(indexer(i,j+1,n))
+    END IF
+    laplaceEval = LaplaceEqn(U0,u_0,u_1,u_2,u_3)
+end function laplaceEval
+
+REAL(8) function updaterEval(i,j,u,n)
+    REAL(8), INTENT(IN), DIMENSION(:) :: u
+    INTEGER(8), INTENT(IN) :: i,j,n
+    !INTEGER(8), EXTERNAL :: indexer
+    !REAL(8), EXTERNAL :: LaplaceEqn
+    REAL(8) :: U0,u_0,u_1,u_2,u_3
+    updaterEval = 0
+    U0 = u(indexer(i,j,n))
+    u_0 = 0
+    u_1 = 0
+    u_2 = 0
+    u_3 = 0
+    IF (i>0) then
+        u_2 = u(indexer(i-1,j,n))
+    END IF
+    IF (i<(n-1)) then
+        u_0 = u(indexer(i+1,j,n))
+    END IF
+    IF (j>0) then
+        u_1 = u(indexer(i,j-1,n))
+    END IF
+    IF (j<(n-1)) then
+        u_3 = u(indexer(i,j+1,n))
+    END IF
+    updaterEval = updater(U0,u_0,u_1,u_2,u_3)
+end function updaterEval
+REAL(8) function L2dif(u,u_prv,ndof)
+    REAL(8), INTENT(IN), DIMENSION(:) :: u,u_prv
+    INTEGER(8), INTENT(IN) :: ndof
+    INTEGER(8) :: i
+    L2dif = 0
+    DO i=0,(ndof-1)
+        L2dif = L2dif + (u(i)-u_prv(i))**2
+    END DO
+    L2dif = DSQRT(L2dif)
+end function L2dif
+REAL(8) function residual(u,n)
+    REAL(8), INTENT(IN), DIMENSION(:) :: u
+    INTEGER(8), INTENT(IN) :: n
+    INTEGER(8) :: i,j
+    !INTEGER(8), EXTERNAL :: indexer
+    REAL(8) :: tmp
+    !REAL(8), EXTERNAL :: LaplaceEqn
+    !REAL(8), EXTERNAL :: laplaceEval
+    residual = 0
+    ! Sides
+    DO i=0,(n-1)
+        DO j=0,(n-1)
+            residual = residual + laplaceEval(i,j,u,n)**2
+        END DO
+    END DO
+    
+end function residual
+
+end module subs
+PROGRAM HW3problem2
     
     ! Author : Dylan Lyon
     ! Title : QR factorizer!
     ! Date : 10/22/2022
 
+
+    ! Functions
+    use subs
+
     IMPLICIT NONE
+
+    
 
     ! Variable declarations
     INTEGER(8) :: i,j,k ! Indices
@@ -16,6 +131,7 @@ PROGRAM HW3problem1
     REAL(8) :: res,rho ! Convergence criterion
     INTEGER(8) :: nitersEstimate ! Estimate based on spectral radius
 
+    
 
     ! File args
     CHARACTER(2) :: solver
@@ -118,117 +234,5 @@ PROGRAM HW3problem1
 
 
     
-contains
+END PROGRAM HW3problem2
 
-INTEGER(8) function indexer(i,j,n)
-    IMPLICIT NONE
-    INTEGER(8), INTENT(IN) :: i,j,n
-    indexer = i*n+j
-end function indexer
-function deindexer(index,n)
-    IMPLICIT NONE
-    INTEGER(8), INTENT(IN) :: index,n
-    INTEGER(8), DIMENSION(:), ALLOCATABLE :: deindexer
-    ALLOCATE(deindexer(0:1));
-    deindexer(1) = index/n
-    deindexer(2) = MOD(index,n)
-
-end function deindexer
-
-REAL(8) function LaplaceEqn(u,u_0,u_1,u_2,u_3)
-    IMPLICIT NONE
-    REAL(8), INTENT(IN) :: u,u_0,u_1,u_2,u_3
-    LaplaceEqn = (u_0+u_1+u_2+u_3-4*u)
-end function LaplaceEqn
-
-REAL(8) function updater(u,u_0,u_1,u_2,u_3)
-    IMPLICIT NONE
-    REAL(8), INTENT(IN) :: u,u_0,u_1,u_2,u_3
-    updater = (u_0+u_1+u_2+u_3-3*u)
-end function updater
-
-REAL(8) function laplaceEval(i,j,u,n)
-    IMPLICIT NONE
-    REAL(8), INTENT(IN), DIMENSION(:) :: u
-    INTEGER(8), INTENT(IN) :: i,j,n
-    INTEGER(8), EXTERNAL :: indexer
-    REAL(8), EXTERNAL :: LaplaceEqn
-    REAL(8) :: U0,u_0,u_1,u_2,u_3
-    laplaceEval = 0
-    U0 = u(indexer(i,j,n))
-    u_0 = 0
-    u_1 = 0
-    u_2 = 0
-    u_3 = 0
-    IF (i>0) then
-        u_2 = u(indexer(i-1,j,n))
-    END IF
-    IF (i<(n-1)) then
-        u_0 = u(indexer(i+1,j,n))
-    END IF
-    IF (j>0) then
-        u_1 = u(indexer(i,j-1,n))
-    END IF
-    IF (j<(n-1)) then
-        u_3 = u(indexer(i,j+1,n))
-    END IF
-    laplaceEval = LaplaceEqn(U0,u_0,u_1,u_2,u_3)
-end function laplaceEval
-
-REAL(8) function updaterEval(i,j,u,n)
-    IMPLICIT NONE
-    REAL(8), INTENT(IN), DIMENSION(:) :: u
-    INTEGER(8), INTENT(IN) :: i,j,n
-    INTEGER(8), EXTERNAL :: indexer
-    REAL(8), EXTERNAL :: LaplaceEqn
-    REAL(8) :: U0,u_0,u_1,u_2,u_3
-    updaterEval = 0
-    U0 = u(indexer(i,j,n))
-    u_0 = 0
-    u_1 = 0
-    u_2 = 0
-    u_3 = 0
-    IF (i>0) then
-        u_2 = u(indexer(i-1,j,n))
-    END IF
-    IF (i<(n-1)) then
-        u_0 = u(indexer(i+1,j,n))
-    END IF
-    IF (j>0) then
-        u_1 = u(indexer(i,j-1,n))
-    END IF
-    IF (j<(n-1)) then
-        u_3 = u(indexer(i,j+1,n))
-    END IF
-    updaterEval = updater(U0,u_0,u_1,u_2,u_3)
-end function updaterEval
-REAL(8) function L2dif(u,u_prv,ndof)
-    IMPLICIT NONE
-    REAL(8), INTENT(IN), DIMENSION(:) :: u,u_prv
-    INTEGER(8), INTENT(IN) :: ndof
-    INTEGER(8) :: i
-    L2dif = 0
-    DO i=0,ndof
-        L2dif = L2dif + (u(i)-u_prv(i))**2
-    END DO
-    L2dif = DSQRT(L2dif)
-end function L2dif
-REAL(8) function residual(u,n)
-    IMPLICIT NONE
-    REAL(8), INTENT(IN), DIMENSION(:) :: u
-    INTEGER(8), INTENT(IN) :: n
-    INTEGER(8) :: i,j
-    INTEGER(8), EXTERNAL :: indexer
-    REAL(8), EXTERNAL :: LaplaceEqn, laplaceEval
-    residual = 0
-    ! Sides
-    i = indexer(1,1,n)
-    DO i=0,(n-1)
-        DO j=0,(n-1)
-            residual = residual + laplaceEval(i,j,n)**2
-        END DO
-    END DO
-    
-end function residual
-
-END PROGRAM HW3problem1
