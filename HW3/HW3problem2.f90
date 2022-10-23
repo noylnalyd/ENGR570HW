@@ -107,7 +107,11 @@ PROGRAM HW3problem1
     IF (res < 1e-3) then
         WRITE(*,*) "Converged"
         rho = tolerance**(1.0/(niters))
-        
+        WRITE(*,'(A,F10.3)') "Solve time (s):", (stop-start)/1000.0
+        WRITE(*,'(A,I10)') "iters:",niters
+        WRITE(*,'(A,ES10.4)') "residual:",res
+        WRITE(*,'(A,F10.4)') "Estimated Spectral Radius:",rho
+        WRITE(*,'(A,F10.4)') "Average time per iter (ms):",(stop-start)/(niters)
     ELSE
         WRITE(*,*) "Diverged."
     END IF
