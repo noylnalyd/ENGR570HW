@@ -8,11 +8,14 @@ PROGRAM HW3problem1
 
     ! Variable declarations
     INTEGER(8) :: i,j,k ! Indices
-    INTEGER(8) :: ndof ! number of u entries
+    INTEGER(8) :: n,ndof,niters ! number of rows/cols, number of u entries, iteration counter
     INTEGER(4) :: verbose ! Verbose control.
     REAL :: start, stop ! timing record
     REAL(8), ALLOCATABLE, DIMENSION(:) :: u,u_prv ! Current and previous solution to Laplace eqn
-    REAL(8) :: tolerance ! Convergence criterion
+    REAL(8) :: tolerance,r0,rL ! Convergence criterion
+    REAL(8) :: res,rho ! Convergence criterion
+    INTEGER(8) :: nitersEstimate ! Estimate based on spectral radius
+
 
     ! File args
     CHARACTER(2) :: solver
@@ -23,6 +26,9 @@ PROGRAM HW3problem1
 
     ! Set verbose
     verbose = 4;
+
+    ! Set tol
+    tolerance = 1e-8
 
     if (verbose > 3) then
         WRITE(*,*) "Declared variables."
@@ -40,7 +46,8 @@ PROGRAM HW3problem1
     
     ! Here's how to organize this
     ! u contains only inside values
-    ndof = (grid_size-2)**2
+    n = grid_size-2
+    ndof = (n)**2
     ALLOCATE(u(0:(ndof-1)))
     ALLOCATE(u_prv(0:(ndof-1)))
     DO i=0,(ndof-1)
@@ -54,14 +61,57 @@ PROGRAM HW3problem1
 
     SELECT CASE (solver)
     CASE("JI")
-        ! Do all edges (Assume grid size > 3)
-        
+        ! Store initial iteration and its sequel
+        DO i=0,(n-1)
+            DO j=0,(n-1)
+                u(indexer(i,j,n)) = updaterEval(i,j,u_prv,n)
+            END DO
+        END DO
+        r0 = L2dif(u,u_prv,ndof)
+        rL = r0
+        ! Overwrite u_prv
+        DO i=0,(ndof-1)
+            u_prv(i) = u(i)
+        END DO
+
+        ! Iterate:
+        niters = 1
+        call cpu_time(start);
+        DO WHILE (r0 * tolerance .ge. rL .and. niters < 500000)
+            ! Find new u
+            DO i=0,(n-1)
+                DO j=0,(n-1)
+                    u(indexer(i,j,n)) = updaterEval(i,j,u_prv,n)
+                END DO
+            END DO
+            ! Compare to u_prv
+            rL = L2dif(u,u_prv,ndof)
+            ! Overwrite u_prv
+            DO i=0,(ndof-1)
+                u_prv(i) = u(i)
+            END DO
+            niters = niters+1
+        END DO
+        call cpu_time(stop);
+
 
     CASE("GS")
     
     CASE("RB")
 
+
+    
     END SELECT
+    ! Write outputs!
+    res = residual(u,n)
+    IF (res < 1e-3) then
+        WRITE(*,*) "Converged"
+        rho = tolerance**(1.0/(niters))
+        
+    ELSE
+        WRITE(*,*) "Diverged."
+    END IF
+
 
     
 contains
@@ -121,67 +171,60 @@ REAL(8) function laplaceEval(i,j,u,n)
     laplaceEval = LaplaceEqn(U0,u_0,u_1,u_2,u_3)
 end function laplaceEval
 
+REAL(8) function updaterEval(i,j,u,n)
+    IMPLICIT NONE
+    REAL(8), INTENT(IN), DIMENSION(:) :: u
+    INTEGER(8), INTENT(IN) :: i,j,n
+    INTEGER(8), EXTERNAL :: indexer
+    REAL(8), EXTERNAL :: LaplaceEqn
+    REAL(8) :: U0,u_0,u_1,u_2,u_3
+    updaterEval = 0
+    U0 = u(indexer(i,j,n))
+    u_0 = 0
+    u_1 = 0
+    u_2 = 0
+    u_3 = 0
+    IF (i>0) then
+        u_2 = u(indexer(i-1,j,n))
+    END IF
+    IF (i<(n-1)) then
+        u_0 = u(indexer(i+1,j,n))
+    END IF
+    IF (j>0) then
+        u_1 = u(indexer(i,j-1,n))
+    END IF
+    IF (j<(n-1)) then
+        u_3 = u(indexer(i,j+1,n))
+    END IF
+    updaterEval = updater(U0,u_0,u_1,u_2,u_3)
+end function updaterEval
+REAL(8) function L2dif(u,u_prv,ndof)
+    IMPLICIT NONE
+    REAL(8), INTENT(IN), DIMENSION(:) :: u,u_prv
+    INTEGER(8), INTENT(IN) :: ndof
+    INTEGER(8) :: i
+    L2dif = 0
+    DO i=0,ndof
+        L2dif = L2dif + (u(i)-u_prv(i))**2
+    END DO
+    L2dif = DSQRT(L2dif)
+end function L2dif
 REAL(8) function residual(u,n)
     IMPLICIT NONE
     REAL(8), INTENT(IN), DIMENSION(:) :: u
     INTEGER(8), INTENT(IN) :: n
     INTEGER(8) :: i,j
     INTEGER(8), EXTERNAL :: indexer
-    REAL(8), EXTERNAL :: LaplaceEqn
+    REAL(8), EXTERNAL :: LaplaceEqn, laplaceEval
     residual = 0
     ! Sides
     i = indexer(1,1,n)
-    DO i=1,(n-1)
-        ! Left
-        residual = residual + LaplaceEqn(u(indexer(i,0,n)),&
-            u(indexer(i+1,0,n)), &
-            u(indexer(i-1,0,n)), &
-            u(indexer(i,1,n)), &
-            0.0)
-        ! Top
-        residual = residual + LaplaceEqn(u(indexer(0,i,n)),&
-            u(indexer(0,i+1,n)), &
-            u(indexer(0,i-1,n)), &
-            u(indexer(1,i,n)), &
-            0.0)
-        ! Right
-        residual = residual + LaplaceEqn(u(indexer(i,n-1,n)),&
-            u(indexer(i+1,n-1,n)), &
-            u(indexer(i-1,n-1,n)), &
-            u(indexer(i,n-2,n)), &
-            0.0)
-        ! Bottom
-        residual = residual + LaplaceEqn(u(indexer(n-1,i,n)),&
-            u(indexer(n-1,i+1,n)), &
-            u(indexer(n-1,i-1,n)), &
-            u(indexer(n-2,i,n)), &
-            0.0)
+    DO i=0,(n-1)
+        DO j=0,(n-1)
+            residual = residual + laplaceEval(i,j,n)**2
+        END DO
     END DO
-    ! Corners
-    ! topleft
-    residual = residual + LaplaceEqn(u(indexer(0,0,n)),&
-        u(indexer(i+1,0,n)), &
-        u(indexer(i-1,0,n)), &
-        0.0, &
-        0.0)
-    ! topright
-    residual = residual + LaplaceEqn(u(indexer(0,n-1,n)),&
-        u(indexer(0,i+1,n)), &
-        u(indexer(0,i-1,n)), &
-        u(indexer(1,i,n)), &
-        0.0)
-    ! bottomleft
-    residual = residual + LaplaceEqn(u(indexer(n-1,0,n)),&
-        u(indexer(i+1,n-1,n)), &
-        u(indexer(i-1,n-1,n)), &
-        u(indexer(i,n-2,n)), &
-        0.0)
-    ! Bottomright
-    residual = residual + LaplaceEqn(u(indexer(n-1,n-1,n)),&
-        u(indexer(n-1,i+1,n)), &
-        u(indexer(n-1,i-1,n)), &
-        u(indexer(n-2,i,n)), &
-        0.0)
+    
 end function residual
 
 END PROGRAM HW3problem1
