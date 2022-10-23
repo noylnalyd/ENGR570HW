@@ -22,7 +22,7 @@ end function LaplaceEqn
 
 REAL(8) function updater(u,u_0,u_1,u_2,u_3)
     REAL(8), INTENT(IN) :: u,u_0,u_1,u_2,u_3
-    updater = (u_0+u_1+u_2+u_3-3*u)
+    updater = (u_0+u_1+u_2+u_3)/4.0
 end function updater
 
 REAL(8) function laplaceEval(i,j,u,n)
@@ -79,7 +79,7 @@ REAL(8) function updaterEval(i,j,u,n)
     updaterEval = updater(U0,u_0,u_1,u_2,u_3)
 end function updaterEval
 REAL(8) function L2dif(u,u_prv,ndof)
-    REAL(8), INTENT(IN), DIMENSION(:) :: u,u_prv
+    REAL(8), INTENT(IN), DIMENSION(:) :: u(0:(ndof-1)),u_prv(0:(ndof-1))
     INTEGER(8), INTENT(IN) :: ndof
     INTEGER(8) :: i
     L2dif = 0
@@ -93,7 +93,6 @@ REAL(8) function residual(u,n)
     INTEGER(8), INTENT(IN) :: n
     INTEGER(8) :: i,j
     !INTEGER(8), EXTERNAL :: indexer
-    REAL(8) :: tmp
     !REAL(8), EXTERNAL :: LaplaceEqn
     !REAL(8), EXTERNAL :: laplaceEval
     residual = 0
@@ -103,7 +102,7 @@ REAL(8) function residual(u,n)
             residual = residual + laplaceEval(i,j,u,n)**2
         END DO
     END DO
-    
+    residual = DSQRT(residual)
 end function residual
 
 end module subs
@@ -129,7 +128,7 @@ PROGRAM HW3problem2
     REAL(8), ALLOCATABLE, DIMENSION(:) :: u,u_prv ! Current and previous solution to Laplace eqn
     REAL(8) :: tolerance,r0,rL ! Convergence criterion
     REAL(8) :: res,rho ! Convergence criterion
-    INTEGER(8) :: nitersEstimate ! Estimate based on spectral radius
+    INTEGER(8) :: nitersEstimate,max_iters ! Estimate based on spectral radius
 
     
 
@@ -141,10 +140,11 @@ PROGRAM HW3problem2
     CHARACTER(100) :: buffer
 
     ! Set verbose
-    verbose = 4;
+    verbose = 1;
 
-    ! Set tol
+    ! Set tol and max iters
     tolerance = 1e-8
+    max_iters = 500000
 
     if (verbose > 3) then
         WRITE(*,*) "Declared variables."
@@ -174,7 +174,7 @@ PROGRAM HW3problem2
     if (verbose > 3) then
         WRITE(*,*) "Allocated and initialized u and u_prv"
     end if
-
+    res = residual(u,n)
     SELECT CASE (solver)
     CASE("JI")
         ! Store initial iteration and its sequel
@@ -193,7 +193,7 @@ PROGRAM HW3problem2
         ! Iterate:
         niters = 1
         call cpu_time(start);
-        DO WHILE (r0 * tolerance .ge. rL .and. niters < 500000)
+        DO WHILE (niters < max_iters .and. residual(u,n) > tolerance)
             ! Find new u
             DO i=0,(n-1)
                 DO j=0,(n-1)
@@ -207,32 +207,113 @@ PROGRAM HW3problem2
                 u_prv(i) = u(i)
             END DO
             niters = niters+1
+            !WRITE(*,*) residual(u,n)
         END DO
         call cpu_time(stop);
 
 
     CASE("GS")
-    
+        ! Store initial iteration and its sequel
+        DO i=0,(n-1)
+            DO j=0,(n-1)
+                u(indexer(i,j,n)) = updaterEval(i,j,u,n)
+            END DO
+        END DO
+        r0 = L2dif(u,u_prv,ndof)
+        rL = r0
+        ! Overwrite u_prv
+        DO i=0,(ndof-1)
+            u_prv(i) = u(i)
+        END DO
+
+        ! Iterate:
+        niters = 1
+        call cpu_time(start);
+        DO WHILE (niters < max_iters .and. residual(u,n) > tolerance)
+            ! Find new u
+            DO i=0,(n-1)
+                DO j=0,(n-1)
+                    u(indexer(i,j,n)) = updaterEval(i,j,u,n)
+                END DO
+            END DO
+            ! Compare to u_prv
+            rL = L2dif(u,u_prv,ndof)
+            ! Overwrite u_prv
+            DO i=0,(ndof-1)
+                u_prv(i) = u(i)
+            END DO
+            niters = niters+1
+            !WRITE(*,*) residual(u,n)
+        END DO
+        call cpu_time(stop);
     CASE("RB")
+        ! Store initial iteration and its sequel
+        ! Black
+        DO i=0,(n-1)
+            DO j=MOD(i,2),n-1,2
+                u(indexer(i,j,n)) = updaterEval(i,j,u_prv,n)
+            END DO
+        END DO
+        ! Red
+        DO i=0,(n-1)
+            DO j=1-MOD(i,2),n-1,2
+                u(indexer(i,j,n)) = updaterEval(i,j,u,n)
+            END DO
+        END DO
+        r0 = L2dif(u,u_prv,ndof)
+        rL = r0
+        ! Overwrite u_prv
+        DO i=0,(ndof-1)
+            u_prv(i) = u(i)
+        END DO
 
-
-    
+        ! Iterate:
+        niters = 1
+        call cpu_time(start);
+        DO WHILE (niters < max_iters .and. residual(u,n) > tolerance)
+            ! Find new u
+            ! Black
+            DO i=0,(n-1)
+                DO j=MOD(i,2),n-1,2
+                    u(indexer(i,j,n)) = updaterEval(i,j,u_prv,n)
+                END DO
+            END DO
+            ! Red
+            DO i=0,(n-1)
+                DO j=1-MOD(i,2),n-1,2
+                    u(indexer(i,j,n)) = updaterEval(i,j,u,n)
+                END DO
+            END DO
+            ! Compare to u_prv
+            rL = L2dif(u,u_prv,ndof)
+            ! Overwrite u_prv
+            DO i=0,(ndof-1)
+                u_prv(i) = u(i)
+            END DO
+            niters = niters+1
+            !WRITE(*,*) residual(u,n)
+        END DO
+        call cpu_time(stop);
     END SELECT
     ! Write outputs!
     res = residual(u,n)
     IF (res < 1e-3) then
         WRITE(*,*) "Converged"
         rho = tolerance**(1.0/(niters))
-        WRITE(*,'(A,F10.3)') "Solve time (s):", (stop-start)/1000.0
-        WRITE(*,'(A,I10)') "iters:",niters
-        WRITE(*,'(A,ES10.4)') "residual:",res
+        nitersEstimate = FLOOR(LOG(1e-6)/LOG(rho))
+        WRITE(*,'(A,F10.3)') "Solve time (s):", (stop-start)
+        if (verbose>0) then
+            WRITE(*,'(A,I10)') "iters:",niters
+            WRITE(*,'(A,ES10.4)') "residual:",res
+        end if
         WRITE(*,'(A,F10.4)') "Estimated Spectral Radius:",rho
-        WRITE(*,'(A,F10.4)') "Average time per iter (ms):",(stop-start)/(niters)
+        if (verbose>0) then
+            WRITE(*,'(A,I10)') "Iterations to reach 10^-6:",nitersEstimate
+        end if
+        WRITE(*,'(A,F10.4)') "Average time per iter (ms):",(stop-start)/(niters)*1000
     ELSE
         WRITE(*,*) "Diverged."
     END IF
-
-
     
 END PROGRAM HW3problem2
 
