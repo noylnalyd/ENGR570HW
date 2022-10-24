@@ -44,7 +44,7 @@ PROGRAM HW3problem1
     CHARACTER(100) :: buffer
 
     ! Set verbose
-    verbose = 4;
+    verbose = 0;
 
     if (verbose > 3) then
         WRITE(*,*) "Allocated data."
@@ -62,7 +62,6 @@ PROGRAM HW3problem1
     mm_in = 1
     q_out = 2
     r_out = 3
-    WRITE(*,*) mmfile
     ! Open units
     OPEN(mm_in,FILE=mmfile)
     OPEN(q_out,FILE="q.mtx")

@@ -175,6 +175,7 @@ PROGRAM HW3problem2
         WRITE(*,*) "Allocated and initialized u and u_prv"
     end if
     res = residual(u,n)
+    r0 = DBLE(n)
     SELECT CASE (solver)
     CASE("JI")
         ! Store initial iteration and its sequel
@@ -183,7 +184,8 @@ PROGRAM HW3problem2
                 u(indexer(i,j,n)) = updaterEval(i,j,u_prv,n)
             END DO
         END DO
-        r0 = L2dif(u,u_prv,ndof)
+        !r0 = L2dif(u,u_prv,ndof)
+        
         rL = r0
         ! Overwrite u_prv
         DO i=0,(ndof-1)
@@ -193,7 +195,7 @@ PROGRAM HW3problem2
         ! Iterate:
         niters = 1
         call cpu_time(start);
-        DO WHILE (niters < max_iters .and. residual(u,n) > tolerance)
+        DO WHILE (niters < max_iters .and. rL > tolerance*r0)
             ! Find new u
             DO i=0,(n-1)
                 DO j=0,(n-1)
@@ -219,7 +221,7 @@ PROGRAM HW3problem2
                 u(indexer(i,j,n)) = updaterEval(i,j,u,n)
             END DO
         END DO
-        r0 = L2dif(u,u_prv,ndof)
+        !r0 = L2dif(u,u_prv,ndof)
         rL = r0
         ! Overwrite u_prv
         DO i=0,(ndof-1)
@@ -229,7 +231,7 @@ PROGRAM HW3problem2
         ! Iterate:
         niters = 1
         call cpu_time(start);
-        DO WHILE (niters < max_iters .and. residual(u,n) > tolerance)
+        DO WHILE (niters < max_iters .and. rL > tolerance*r0)
             ! Find new u
             DO i=0,(n-1)
                 DO j=0,(n-1)
@@ -260,7 +262,7 @@ PROGRAM HW3problem2
                 u(indexer(i,j,n)) = updaterEval(i,j,u,n)
             END DO
         END DO
-        r0 = L2dif(u,u_prv,ndof)
+        !r0 = L2dif(u,u_prv,ndof)
         rL = r0
         ! Overwrite u_prv
         DO i=0,(ndof-1)
@@ -270,7 +272,7 @@ PROGRAM HW3problem2
         ! Iterate:
         niters = 1
         call cpu_time(start);
-        DO WHILE (niters < max_iters .and. residual(u,n) > tolerance)
+        DO WHILE (niters < max_iters .and. rL > tolerance*r0)
             ! Find new u
             ! Black
             DO i=0,(n-1)
@@ -297,20 +299,21 @@ PROGRAM HW3problem2
     END SELECT
     ! Write outputs!
     res = residual(u,n)
-    IF (res < 1e-3) then
+    WRITE(*,*) res
+    IF (rL/r0 < tolerance) then
         WRITE(*,*) "Converged"
         rho = tolerance**(1.0/(niters))
         nitersEstimate = FLOOR(LOG(1e-6)/LOG(rho))
-        WRITE(*,'(A,F10.3)') "Solve time (s):", (stop-start)
+        WRITE(*,'(A,F10.3)') "solve time (s): ", (stop-start)
         if (verbose>0) then
-            WRITE(*,'(A,I10)') "iters:",niters
-            WRITE(*,'(A,ES10.4)') "residual:",res
+            WRITE(*,'(A,I10)') "iters: ",niters
+            WRITE(*,'(A,ES10.4)') "residual: ",rL/r0
         end if
-        WRITE(*,'(A,F10.4)') "Estimated Spectral Radius:",rho
+        WRITE(*,'(A,F10.4)') "Estimated spectral radius: ",rho
         if (verbose>0) then
-            WRITE(*,'(A,I10)') "Iterations to reach 10^-6:",nitersEstimate
+            WRITE(*,'(A,I10)') "Iterations to reach 10^-6: ",nitersEstimate
         end if
-        WRITE(*,'(A,F10.4)') "Average time per iter (ms):",(stop-start)/(niters)*1000
+        WRITE(*,'(A,F10.4)') "Average time per iter (ms): ",(stop-start)/(niters)*1000
     ELSE
         WRITE(*,*) "Diverged."
     END IF
