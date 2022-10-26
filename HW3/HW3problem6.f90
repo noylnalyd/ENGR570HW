@@ -90,7 +90,7 @@ IMPLICIT NONE
     INTEGER(8) :: i
     L2dif = 0
     DO i=0,(ndof-1)
-        L2dif = L2dif + (u(i)-u_prv(i))*(u(i)-u_prv(i))
+        L2dif = L2dif + (u(i)-u_prv(i))**2
     END DO
     L2dif = DSQRT(L2dif)
 end function L2dif
@@ -127,11 +127,14 @@ PROGRAM HW3problem2
 
     
 
+
+
     ! Variable declarations
     INTEGER(8) :: i,j,k ! Indices
-    INTEGER(8) :: n,ndof,niters ! number of rows/cols, number of u entries, iteration counter
+    INTEGER(8) :: m,n,ndof,niters ! number of rows/cols, number of u entries, iteration counter
     INTEGER(4) :: verbose ! Verbose control.
     REAL :: start, stop ! timing record
+    REAL(8), ALLOCATABLE, DIMENSION(:,:) :: A ! Dense Matrix
     REAL(8), ALLOCATABLE, DIMENSION(:) :: u,u_prv ! Current and previous solution to Laplace eqn
     REAL(8) :: tolerance,r0,rL ! Convergence criterion
     REAL(8) :: res,rho ! Convergence criterion
@@ -146,22 +149,20 @@ PROGRAM HW3problem2
     ! Input buffer
     CHARACTER(100) :: buffer
 
+    ! Matrix numbers from petsc, poisson 5 stencil
+    m = 8
+    n = 7
+
     ! Set verbose
     verbose = 1;
 
     ! Set tol and max iters
-    tolerance = 1e-8
+    tolerance = 1e-7
     max_iters = 500000
 
     if (verbose > 3) then
         WRITE(*,*) "Declared variables."
     end if
-
-    ! Read input
-    CALL GETARG(1,buffer)
-    READ(buffer,*) solver
-    CALL GETARG(2,buffer)
-    READ(buffer,*) grid_size
     
     if (verbose > 3) then
         WRITE(*,*) "Read inputs."
@@ -169,8 +170,8 @@ PROGRAM HW3problem2
     
     ! Here's how to organize this
     ! u contains only inside values
-    n = grid_size
-    ndof = (n)**2
+    ndof = m*n
+    ALLOCATE(A(0:(ndof-1),0:(ndof-1)))
     ALLOCATE(u(0:(ndof-1)))
     ALLOCATE(u_prv(0:(ndof-1)))
     DO i=0,(ndof-1)
@@ -186,7 +187,8 @@ PROGRAM HW3problem2
     if (verbose > 3) then
         WRITE(*,*) "Allocated and initialized u and u_prv"
     end if
-    res = residual(u,n)
+
+    res = residual(u,m,n)
     
     SELECT CASE (solver)
     CASE("JI")
