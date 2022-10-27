@@ -135,7 +135,9 @@ PROGRAM HW3problem2
     INTEGER(4) :: verbose ! Verbose control.
     REAL :: start, stop ! timing record
     REAL(8), ALLOCATABLE, DIMENSION(:,:) :: A ! Dense Matrix
-    REAL(8), ALLOCATABLE, DIMENSION(:) :: u,u_prv ! Current and previous solution to Laplace eqn
+    REAL(8), ALLOCATABLE, DIMENSION(:) :: x,x_prv ! Current and previous solution to Laplace eqn
+    REAL(8), ALLOCATABLE, DIMENSION(:) :: p,p_prv,r,r_prv,v,v_prv,s,t,h
+    REAL(8) :: rho,rho_prv,alpha,w,w_prv
     REAL(8) :: tolerance,r0,rL ! Convergence criterion
     REAL(8) :: res,rho ! Convergence criterion
     INTEGER(8) :: nitersEstimate,max_iters ! Estimate based on spectral radius
@@ -168,15 +170,66 @@ PROGRAM HW3problem2
         WRITE(*,*) "Read inputs."
     end if
     
-    ! Here's how to organize this
-    ! u contains only inside values
+    ! Initialize and allocate
     ndof = m*n
+    alpha = 1
+    rho = 1
+    rho_prv = 1
+    w = 1
+    w_prv = 1
+
+
     ALLOCATE(A(0:(ndof-1),0:(ndof-1)))
-    ALLOCATE(u(0:(ndof-1)))
-    ALLOCATE(u_prv(0:(ndof-1)))
+    ALLOCATE(x(0:(ndof-1)))
+    ALLOCATE(x_prv(0:(ndof-1)))
+    ALLOCATE(r(0:(ndof-1)))
+    ALLOCATE(r_prv(0:(ndof-1)))
+    ALLOCATE(p(0:(ndof-1)))
+    ALLOCATE(p_prv(0:(ndof-1)))
+    ALLOCATE(v(0:(ndof-1)))
+    ALLOCATE(v_prv(0:(ndof-1)))
+    ALLOCATE(s(0:(ndof-1)))
+    ALLOCATE(h(0:(ndof-1)))
+
     DO i=0,(ndof-1)
-        u(i) = 1
-        u_prv(i) = 0
+        x(i) = 1
+        x_prv(i) = 0
+        r(i) = 0
+        r_prv(i) = 0
+        p(i) = 0
+        p_prv(i) = 0
+        v(i) = 0
+        v_prv(i) = 0
+        s(i) = 0
+        h(i) = 0
+        DO j=0,(ndof-1)
+            A(i,j) = 0
+        END DO
+    END DO
+    DO i=0,m-1
+        DO j=0,n-1
+    	    A(i,j) = 4;
+        END DO
+    END DO
+    DO i=0,m-1
+        DO j=1,n-1
+    	    A(i,j-1) = -1;
+        END DO
+    END DO
+    DO i=0,m-1
+        DO j=0,n-2
+    	    A(i,j+1) = -1;
+        END DO
+    END DO
+    DO i=1,m-1
+        DO j=0,n-1
+    	    A(i-1,j) = -1;
+        END DO
+    END DO
+    DO i=0,m-2
+        DO j=0,n-1
+    	    A(i+1,j) = -1;
+        END DO
     END DO
     r0 = L2dif(u,u_prv,ndof)
     rL = r0
