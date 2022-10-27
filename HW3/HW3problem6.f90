@@ -83,6 +83,81 @@ IMPLICIT NONE
     END IF
     updaterEval = updater(U0,u_0,u_1,u_2,u_3)
 end function updaterEval
+function svp(s,u,ndof)
+    IMPLICIT NONE
+    INTEGER(8), INTENT(IN) :: ndof
+    REAL(8), INTENT(IN), DIMENSION(:) :: u(0:(ndof-1))
+    REAL(8), INTENT(IN) :: s
+    REAL(8), DIMENSION(0:(ndof-1)) :: svp
+    INTEGER(8) :: i
+    DO i=0,(ndof-1)
+        svp(i) = s*u(i)
+    END DO
+end
+REAL(8) function vvdot(u1,u2,ndof)
+    IMPLICIT NONE
+    INTEGER(8), INTENT(IN) :: ndof
+    REAL(8), INTENT(IN), DIMENSION(:) :: u1(0:(ndof-1)),u2(0:(ndof-1))
+    INTEGER(8) :: i
+    vvdot = 0
+    DO i=0,(ndof-1)
+        vvdot = vvdot + u1(i)*u2(i)
+    END DO
+end
+function vva(u1,u2,ndof)
+    IMPLICIT NONE
+    INTEGER(8), INTENT(IN) :: ndof
+    REAL(8), INTENT(IN), DIMENSION(:) :: u1(0:(ndof-1)),u2(0:(ndof-1))
+    REAL(8), DIMENSION(0:(ndof-1)) :: vva
+    INTEGER(8) :: i
+    DO i=0,(ndof-1)
+        vva(i) = u1(i)+u2(i)
+    END DO
+end
+function mvp(A,x,ndof)
+    IMPLICIT NONE
+    INTEGER(8), INTENT(IN) :: ndof
+    REAL(8), INTENT(IN), DIMENSION(:,:) :: A(0:(ndof-1),0:(ndof-1))
+    REAL(8), INTENT(IN), DIMENSION(:) :: x(0:(ndof-1))
+    REAL(8), DIMENSION(0:(ndof-1)) :: mvp
+    INTEGER(8) :: i,j
+    DO i=0,(ndof-1)
+        mvp(i) = 0
+        DO j=0,(ndof-1)
+            mvp(i) = mvp(i) + A(i,j) * x(j)
+        END DO
+    END DO
+end
+function residual(A,x,b,ndof)
+    IMPLICIT NONE
+    INTEGER(8), INTENT(IN) :: ndof
+    REAL(8), INTENT(IN), DIMENSION(:,:) :: A(0:(ndof-1),0:(ndof-1))
+    REAL(8), INTENT(IN), DIMENSION(:) :: x(0:(ndof-1)),b(0:(ndof-1))
+    INTEGER(8) :: i,j
+    REAL(8), DIMENSION(:) :: residual(0:(ndof-1))
+    residual = vva(mvp(A,x,ndof),svp(DBLE(-1),b,ndof),ndof)
+end
+REAL(8) function L2norm(u,ndof)
+    IMPLICIT NONE
+    INTEGER(8), INTENT(IN) :: ndof
+    REAL(8), INTENT(IN), DIMENSION(:) :: u(0:(ndof-1))
+    INTEGER(8) :: i
+    L2norm = 0
+    DO i=0,(ndof-1)
+        L2norm = L2norm + (u(i))**2
+    END DO
+    L2norm = DSQRT(L2norm)
+end
+
+LOGICAL function checkRes(A,x,b,tolerance,ndof)
+    IMPLICIT NONE
+    INTEGER(8), INTENT(IN) :: ndof
+    REAL(8), INTENT(IN), DIMENSION(:,:) :: A(0:(ndof-1),0:(ndof-1))
+    REAL(8), INTENT(IN), DIMENSION(:) :: x(0:(ndof-1)),b(0:(ndof-1))
+    REAL(8), INTENT(IN) :: tolerance
+    checkRes = (L2norm(residual(A,x,b,ndof),ndof) < tolerance)
+END
+
 REAL(8) function L2dif(u,u_prv,ndof)
 IMPLICIT NONE
     REAL(8), INTENT(IN), DIMENSION(:) :: u(0:(ndof-1)),u_prv(0:(ndof-1))
@@ -94,26 +169,9 @@ IMPLICIT NONE
     END DO
     L2dif = DSQRT(L2dif)
 end function L2dif
-REAL(8) function residual(u,n)
-IMPLICIT NONE
-    REAL(8), INTENT(IN), DIMENSION(:) :: u
-    INTEGER(8), INTENT(IN) :: n
-    INTEGER(8) :: i,j
-    !INTEGER(8), EXTERNAL :: indexer
-    !REAL(8), EXTERNAL :: LaplaceEqn
-    !REAL(8), EXTERNAL :: laplaceEval
-    residual = 0
-    ! Sides
-    DO i=0,(n-1)
-        DO j=0,(n-1)
-            residual = residual + laplaceEval(i,j,u,n)**2
-        END DO
-    END DO
-    residual = DSQRT(residual)
-end function residual
 
 end module subs
-PROGRAM HW3problem2
+PROGRAM HW3problem6
     
     ! Author : Dylan Lyon
     ! Title : Laplacer
@@ -136,10 +194,9 @@ PROGRAM HW3problem2
     REAL :: start, stop ! timing record
     REAL(8), ALLOCATABLE, DIMENSION(:,:) :: A ! Dense Matrix
     REAL(8), ALLOCATABLE, DIMENSION(:) :: x,x_prv ! Current and previous solution to Laplace eqn
-    REAL(8), ALLOCATABLE, DIMENSION(:) :: p,p_prv,r,r_prv,v,v_prv,s,t,h
-    REAL(8) :: rho,rho_prv,alpha,w,w_prv
+    REAL(8), ALLOCATABLE, DIMENSION(:) :: p,p_prv,r,r_prv,v,v_prv,s,t,h,b,res
+    REAL(8) :: rho,rho_prv,alpha,beta,w,w_prv
     REAL(8) :: tolerance,r0,rL ! Convergence criterion
-    REAL(8) :: res,rho ! Convergence criterion
     INTEGER(8) :: nitersEstimate,max_iters ! Estimate based on spectral radius
 
     
@@ -160,7 +217,7 @@ PROGRAM HW3problem2
 
     ! Set tol and max iters
     tolerance = 1e-7
-    max_iters = 500000
+    max_iters = 5000
 
     if (verbose > 3) then
         WRITE(*,*) "Declared variables."
@@ -190,6 +247,7 @@ PROGRAM HW3problem2
     ALLOCATE(v_prv(0:(ndof-1)))
     ALLOCATE(s(0:(ndof-1)))
     ALLOCATE(h(0:(ndof-1)))
+    ALLOCATE(b(0:(ndof-1)))
 
     DO i=0,(ndof-1)
         x(i) = 1
@@ -202,124 +260,75 @@ PROGRAM HW3problem2
         v_prv(i) = 0
         s(i) = 0
         h(i) = 0
+        b(i) = 0
         DO j=0,(ndof-1)
             A(i,j) = 0
         END DO
     END DO
     DO i=0,m-1
         DO j=0,n-1
-    	    A(i,j) = 4;
+    	    A(indexer(i,j,n),indexer(i,j,n)) = 4;
         END DO
     END DO
     DO i=0,m-1
         DO j=1,n-1
-    	    A(i,j-1) = -1;
+    	    A(indexer(i,j,n),indexer(i,j-1,n)) = -1;
         END DO
     END DO
     DO i=0,m-1
         DO j=0,n-2
-    	    A(i,j+1) = -1;
+    	    A(indexer(i,j,n),indexer(i,j+1,n)) = -1;
         END DO
     END DO
     DO i=1,m-1
         DO j=0,n-1
-    	    A(i-1,j) = -1;
+    	    A(indexer(i,j,n),indexer(i-1,j,n)) = -1;
         END DO
     END DO
     DO i=0,m-2
         DO j=0,n-1
-    	    A(i+1,j) = -1;
+    	    A(indexer(i,j,n),indexer(i+1,j,n)) = -1;
         END DO
     END DO
-    r0 = L2dif(u,u_prv,ndof)
-    rL = r0
+
+    r = vva(b,svp(DBLE(-1),mvp(A,x,ndof),ndof),ndof)
     DO i=0,(ndof-1)
-        u_prv(i) = 1
+        r_prv(i) = r(i)
     END DO
+    niters = 0
+    DO WHILE(niters<max_iters)
+        rho = vvdot(r,r_prv,ndof)
+        beta = (rho/rho_prv)*(alpha/w_prv)
+        p = vva(r_prv,svp(beta,vva(p_prv,svp(-w_prv,v_prv,ndof),ndof),ndof),ndof)
+        v = mvp(A,p,ndof)
+        alpha = rho/vvdot(r,v,ndof)
+        h = vva(x_prv,svp(alpha,p,ndof),ndof)
+        ! Check h accuracy
+        if(checkRes(A,h,b,tolerance,ndof)) then
+            x = svp(DBLE(1),h,ndof)
+            exit
+        end if
+        s = vva(r_prv,svp(-alpha,v,ndof),ndof)
+        t = mvp(A,s,ndof)
+        w = vvdot(t,s,ndof)/vvdot(t,t,ndof)
+        x = vva(h,svp(w,s,ndof),ndof)
+        ! Check x accuracy
+        if(checkRes(A,x,b,tolerance,ndof)) then
+            exit
+        end if
+        r = vva(s,svp(-w,t,ndof),ndof)
 
-    if (verbose > 3) then
-        WRITE(*,*) "Allocated and initialized u and u_prv"
-    end if
-
-    res = residual(u,m,n)
+        ! Update all prvs x r p v rho w
+        rho_prv = rho
+        w_prv = w
+        DO i=0,(ndof-1)
+            x_prv(i) = x(i)
+            r_prv(i) = r(i)
+            p_prv(i) = p(i)
+            v_prv(i) = v(i)
+        END DO
+    END DO
     
-    SELECT CASE (solver)
-    CASE("JI")
-        
-        ! Iterate:
-        niters = 1
-        call cpu_time(start);
-        DO WHILE (niters < max_iters .and. rL > tolerance*r0)
-            ! Find new u
-            DO i=0,(n-1)
-                DO j=0,(n-1)
-                    u(indexer(i,j,n)) = updaterEval(i,j,u_prv,n)
-                END DO
-            END DO
-            ! Compare to u_prv
-            rL = L2dif(u,u_prv,ndof)
-            ! Overwrite u_prv
-            DO i=0,(ndof-1)
-                u_prv(i) = u(i)
-            END DO
-            niters = niters+1
-            !WRITE(*,*) residual(u,n)
-        END DO
-        call cpu_time(stop);
-
-
-    CASE("GS")
-
-        ! Iterate:
-        niters = 1
-        call cpu_time(start);
-        DO WHILE (niters < max_iters .and. rL > r0*tolerance)
-            ! Find new u
-            DO i=0,(n-1)
-                DO j=0,(n-1)
-                    u(indexer(i,j,n)) = updaterEval(i,j,u,n)
-                END DO
-            END DO
-            ! Compare to u_prv
-            rL = L2dif(u,u_prv,ndof)
-            ! Overwrite u_prv
-            DO i=0,(ndof-1)
-                u_prv(i) = u(i)
-            END DO
-            niters = niters+1
-            !WRITE(*,*) residual(u,n)
-        END DO
-        call cpu_time(stop);
-    CASE("RB")
-
-        ! Iterate:
-        niters = 1
-        call cpu_time(start);
-        DO WHILE (niters < max_iters .and. rL > tolerance*r0)
-            ! Find new u
-            ! Black
-            DO i=0,(n-1)
-                DO j=MOD(i,2),n-1,2
-                    u(indexer(i,j,n)) = updaterEval(i,j,u_prv,n)
-                END DO
-            END DO
-            ! Red
-            DO i=0,(n-1)
-                DO j=1-MOD(i,2),n-1,2
-                    u(indexer(i,j,n)) = updaterEval(i,j,u,n)
-                END DO
-            END DO
-            ! Compare to u_prv
-            rL = L2dif(u,u_prv,ndof)
-            ! Overwrite u_prv
-            DO i=0,(ndof-1)
-                u_prv(i) = u(i)
-            END DO
-            niters = niters+1
-            !WRITE(*,*) residual(u,n)
-        END DO
-        call cpu_time(stop);
-    END SELECT
     ! Write outputs!
     res = residual(u,n)
     IF (rL/r0 < tolerance) then
@@ -340,5 +349,5 @@ PROGRAM HW3problem2
         WRITE(*,*) "Diverged."
     END IF
     
-END PROGRAM HW3problem2
+END PROGRAM HW3problem6
 
