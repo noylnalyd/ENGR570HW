@@ -1,3 +1,66 @@
+module sparseMatrix
+    implicit none
+    private
+  
+    type, public :: ELL_Matrix
+        INTEGER(8), public :: ndof
+        INTEGER(8), public :: colnummax
+        INTEGER(8), ALLOCATABLE, DIMENSION(:,:) :: colidx
+        INTEGER(8), ALLOCATABLE, DIMENSION(:) :: colnum
+        REAL(8), ALLOCATABLE, DIMENSION(:,:) :: vals
+    contains
+        procedure, public :: build => build
+        procedure, public :: getVal => getVal
+        procedure, public :: addVal => addVal
+        procedure, public :: SMVM => SMVM
+    end type ELL_Matrix
+contains
+    subroutine build(this)
+        CLASS(ELL_Matrix), intent(inout) :: this
+        INTEGER(8) :: i,j
+        ALLOCATE(this%vals(0:(this%ndof-1),0:this%colnummax))
+        ALLOCATE(this%colidx(0:(this%ndof-1),0:this%colnummax))
+        ALLOCATE(this%colnum(0:(this%ndof-1)))
+        DO i=0,(this%ndof-1)
+            this%colnum(i) = 0
+            DO j=0,this%colnummax
+                this%colidx(i,j) = -1
+                this%vals(i,j) = -1000
+            END DO
+        END DO
+    end subroutine build
+    subroutine addVal(this,row,col,val)
+        CLASS(ELL_Matrix), intent(inout) :: this
+        INTEGER(8), INTENT(IN) :: row,col
+        REAL(8), INTENT(IN) :: val
+        this%vals(row,this%colnum(row)) = val
+        this%colidx(row,this%colnum(row)) = col
+        this%colnum(row) = this%colnum(row) + 1
+    end subroutine addVal
+    REAL(8) function getVal(this,row,col) result(val)
+        CLASS(ELL_Matrix), intent(inout) :: this
+        INTEGER(8), INTENT(IN) :: row,col
+        INTEGER(8) :: j
+        DO j=0,this%colnum(row)
+            if (this%colidx(row,j) .eq. col) then
+                val = this%vals(row,j)
+                return
+            end if
+        end do
+    end function getVal
+    subroutine SMVM(this,x,out)
+        CLASS(ELL_Matrix), intent(inout) :: this
+        REAL(8), INTENT(IN), DIMENSION(0:(this%ndof-1)) :: x
+        REAL(8), INTENT(OUT), DIMENSION(0:(this%ndof-1)) :: out
+        INTEGER(8) i,j
+        DO i=0,(this%ndof-1)
+            out(i) = 0
+            DO j=0,(this%colnum(i)-1)
+                out(i) = out(i) + this%vals(i,j) * x(this%colidx(i,j))
+            END DO
+        END DO
+    end subroutine SMVM
+end module sparseMatrix
 module subs
     IMPLICIT NONE
     contains
@@ -174,12 +237,13 @@ end module subs
 PROGRAM HW3problem6
     
     ! Author : Dylan Lyon
-    ! Title : Laplacer
-    ! Date : 10/22/2022
+    ! Title : bicgstabber
+    ! Date : 10/26/2022
 
 
     ! Functions
     use subs
+    use sparseMatrix
 
     IMPLICIT NONE
 
@@ -192,14 +256,12 @@ PROGRAM HW3problem6
     INTEGER(8) :: m,n,ndof,niters ! number of rows/cols, number of u entries, iteration counter
     INTEGER(4) :: verbose ! Verbose control.
     REAL :: start, stop ! timing record
-    REAL(8), ALLOCATABLE, DIMENSION(:,:) :: A ! Dense Matrix
+    TYPE(ELL_Matrix) :: A ! Sparse matrix
     REAL(8), ALLOCATABLE, DIMENSION(:) :: x,x_prv ! Current and previous solution to Laplace eqn
-    REAL(8), ALLOCATABLE, DIMENSION(:) :: p,p_prv,r,r_prv,v,v_prv,s,t,h,b,res
+    REAL(8), ALLOCATABLE, DIMENSION(:) :: p,p_prv,r,r_prv,v,v_prv,s,t,h,b,res,dummy
     REAL(8) :: rho,rho_prv,alpha,beta,w,w_prv
     REAL(8) :: tolerance,r0,rL ! Convergence criterion
     INTEGER(8) :: nitersEstimate,max_iters ! Estimate based on spectral radius
-
-    
 
     ! File args
     CHARACTER(2) :: solver
@@ -209,8 +271,8 @@ PROGRAM HW3problem6
     CHARACTER(100) :: buffer
 
     ! Matrix numbers from petsc, poisson 5 stencil
-    m = 8
-    n = 7
+    m = 100
+    n = 100
 
     ! Set verbose
     verbose = 1;
@@ -235,8 +297,11 @@ PROGRAM HW3problem6
     w = 1
     w_prv = 1
 
+    ! Build A
+    A%colnummax = 5
+    A%ndof = ndof
+    call A%build()
 
-    ALLOCATE(A(0:(ndof-1),0:(ndof-1)))
     ALLOCATE(x(0:(ndof-1)))
     ALLOCATE(x_prv(0:(ndof-1)))
     ALLOCATE(r(0:(ndof-1)))
@@ -248,6 +313,7 @@ PROGRAM HW3problem6
     ALLOCATE(s(0:(ndof-1)))
     ALLOCATE(h(0:(ndof-1)))
     ALLOCATE(b(0:(ndof-1)))
+    ALLOCATE(res(0:max_iters))
 
     DO i=0,(ndof-1)
         x(i) = 1
@@ -291,11 +357,15 @@ PROGRAM HW3problem6
         END DO
     END DO
 
-    r = vva(b,svp(DBLE(-1),mvp(A,x,ndof),ndof),ndof)
+    
+    r = residual(A,x,b,ndof)
+    res(0) = L2norm(r,ndof)
     DO i=0,(ndof-1)
         r_prv(i) = r(i)
     END DO
-    niters = 0
+
+    niters = 1
+    call cpu_time(start);
     DO WHILE(niters<max_iters)
         rho = vvdot(r,r_prv,ndof)
         beta = (rho/rho_prv)*(alpha/w_prv)
@@ -306,13 +376,16 @@ PROGRAM HW3problem6
         ! Check h accuracy
         if(checkRes(A,h,b,tolerance,ndof)) then
             x = svp(DBLE(1),h,ndof)
+            res(niters) = L2norm(residual(A,x,b,ndof),ndof)
             exit
         end if
         s = vva(r_prv,svp(-alpha,v,ndof),ndof)
         t = mvp(A,s,ndof)
         w = vvdot(t,s,ndof)/vvdot(t,t,ndof)
         x = vva(h,svp(w,s,ndof),ndof)
+
         ! Check x accuracy
+        res(niters) = L2norm(residual(A,x,b,ndof),ndof)
         if(checkRes(A,x,b,tolerance,ndof)) then
             exit
         end if
@@ -327,10 +400,15 @@ PROGRAM HW3problem6
             p_prv(i) = p(i)
             v_prv(i) = v(i)
         END DO
+
+        niters = niters + 1
     END DO
+    call cpu_time(stop);
     
+    WRITE(*,*) "Iteration count: ",niters
+    WRITE(*,*) "Average time per iteration (ms): ", (stop-start)/DBLE(niters)*1000
+    WRITE(*,*) "Residual: ", res(niters)
     ! Write outputs!
-    res = residual(u,n)
     IF (rL/r0 < tolerance) then
         WRITE(*,*) "Converged"
         rho = tolerance**(1.0/(niters))
