@@ -5,9 +5,9 @@ module sparseMatrix
     type, public :: ELL_Matrix
         INTEGER(8), public :: ndof
         INTEGER(8), public :: colnummax
-        INTEGER(8), ALLOCATABLE, DIMENSION(:,:) :: colidx
-        INTEGER(8), ALLOCATABLE, DIMENSION(:) :: colnum
-        REAL(8), ALLOCATABLE, DIMENSION(:,:) :: vals
+        INTEGER(8), ALLOCATABLE, DIMENSION(:,:), public :: colidx
+        INTEGER(8), ALLOCATABLE, DIMENSION(:), public :: colnum
+        REAL(8), ALLOCATABLE, DIMENSION(:,:), public :: vals
     contains
         procedure, public :: build => build
         procedure, public :: getVal => getVal
@@ -25,7 +25,7 @@ contains
             this%colnum(i) = 0
             DO j=0,this%colnummax
                 this%colidx(i,j) = -1
-                this%vals(i,j) = -1000
+                this%vals(i,j) = -10000
             END DO
         END DO
     end subroutine build
@@ -87,7 +87,7 @@ end SUBROUTINE svp
 SUBROUTINE vcp(u1,u2,ndof)
     IMPLICIT NONE
     INTEGER(8), INTENT(IN) :: ndof
-    REAL(8), INTENT(IN), DIMENSION(:) :: u1(0:(ndof-1))
+    REAL(8), INTENT(IN), DIMENSION(0:(ndof-1)) :: u1
     REAL(8), INTENT(OUT), DIMENSION(0:(ndof-1)) :: u2
     INTEGER(8) :: i
     DO i=0,(ndof-1)
@@ -119,7 +119,7 @@ subroutine vvs(u1,u2,out,ndof)
     IMPLICIT NONE
     INTEGER(8), INTENT(IN) :: ndof
     REAL(8), INTENT(IN), DIMENSION(:) :: u1(0:(ndof-1)),u2(0:(ndof-1))
-    REAL(8), INTENT(OUT), DIMENSION(0:(ndof-1)) :: out
+    REAL(8), INTENT(INOUT), DIMENSION(0:(ndof-1)) :: out
     INTEGER(8) :: i
     DO i=0,(ndof-1)
         out(i) = u1(i)-u2(i)
@@ -134,7 +134,7 @@ subroutine residual(A,x,b,out,ndof)
     REAL(8), INTENT(INOUT), DIMENSION(0:(ndof-1)) :: out
     INTEGER(8) :: i,j
     call A%SMVM(x,out)
-    call vva(out,b,out,ndof)
+    call vvs(b,out,out,ndof)
 end subroutine residual
 
 REAL(8) function L2norm(u,ndof)
@@ -170,17 +170,22 @@ PROGRAM HW3problem6
     REAL :: start, stop ! timing record
     TYPE(ELL_Matrix) :: A ! Sparse matrix
     REAL(8), ALLOCATABLE, DIMENSION(:) :: x,x_prv ! Current and previous solution to Laplace eqn
-    REAL(8), ALLOCATABLE, DIMENSION(:) :: p,p_prv,r,r_prv,v,v_prv,s,t,h,b,res,dummy
+    REAL(8), ALLOCATABLE, DIMENSION(:) :: p,p_prv,r,r_prv,r0prime,v,v_prv,s,t,h,b,res,dummy
     REAL(8) :: rho,rho_prv,alpha,beta,w,w_prv
     REAL(8) :: tolerance ! Convergence criterion
     INTEGER(8) :: max_iters ! max_iters
 
     ! File args
-    CHARACTER(2) :: solver
-    INTEGER(8) :: grid_size
+    INTEGER(8) :: out_unit
+    CHARACTER(100) :: file_name
 
     ! Input buffer
     CHARACTER(100) :: buffer
+
+    ! Output
+    out_unit = 2
+    file_name = "myStab.txt"
+    open(unit=out_unit,file=file_name)
 
     ! Matrix numbers from petsc, poisson 5 stencil
     m = 100
@@ -191,7 +196,7 @@ PROGRAM HW3problem6
 
     ! Set tol and max iters
     tolerance = 1e-7
-    max_iters = 5000
+    max_iters = 500
 
     if (verbose > 3) then
         WRITE(*,*) "Declared variables."
@@ -218,20 +223,22 @@ PROGRAM HW3problem6
     ALLOCATE(x_prv(0:(ndof-1)))
     ALLOCATE(r(0:(ndof-1)))
     ALLOCATE(r_prv(0:(ndof-1)))
+    ALLOCATE(r0prime(0:(ndof-1)))
     ALLOCATE(p(0:(ndof-1)))
     ALLOCATE(p_prv(0:(ndof-1)))
     ALLOCATE(v(0:(ndof-1)))
     ALLOCATE(v_prv(0:(ndof-1)))
     ALLOCATE(s(0:(ndof-1)))
+    ALLOCATE(t(0:(ndof-1)))
     ALLOCATE(h(0:(ndof-1)))
     ALLOCATE(b(0:(ndof-1)))
     ALLOCATE(dummy(0:(ndof-1)))
     ALLOCATE(res(0:max_iters))
 
     DO i=0,(ndof-1)
-        x(i) = 1
+        x(i) = 0
         x_prv(i) = 0
-        r(i) = 0
+        r(i) = 1
         r_prv(i) = 0
         p(i) = 0
         p_prv(i) = 0
@@ -243,43 +250,45 @@ PROGRAM HW3problem6
     END DO
     DO i=0,m-1
         DO j=0,n-1
-            call A%addVal(i,i,DBLE(4));
+            call A%addVal(indexer(i,j,n),indexer(i,j,n),DBLE(4));
         END DO
     END DO
     DO i=0,m-1
         DO j=1,n-1
-    	    call A%addVal(i,j-1,DBLE(-1));
+    	    call A%addVal(indexer(i,j,n),indexer(i,j-1,n),DBLE(-1));
         END DO
     END DO
     DO i=0,m-1
         DO j=0,n-2
-            call A%addVal(i,j+1,DBLE(-1));
+            call A%addVal(indexer(i,j,n),indexer(i,j+1,n),DBLE(-1));
         END DO
     END DO
     DO i=1,m-1
         DO j=0,n-1
-            call A%addVal(i-1,j,DBLE(-1));
+            call A%addVal(indexer(i,j,n),indexer(i-1,j,n),DBLE(-1));
         END DO
     END DO
     DO i=0,m-2
         DO j=0,n-1
-            call A%addVal(i+1,j,DBLE(-1));
+            call A%addVal(indexer(i,j,n),indexer(i+1,j,n),DBLE(-1));
         END DO
     END DO
 
+    ! Compute rhs
+    call A%SMVM(r,b)
+
     ! Initial residual
-    call residual(A,x,b,r,ndof)
-    res(0) = L2norm(r,ndof)
-    DO i=0,(ndof-1)
-        r_prv(i) = r(i)
-    END DO
+    call residual(A,x,b,r0prime,ndof)
+    res(0) = L2norm(r0prime,ndof)
+    call vcp(r0prime,r,ndof)
+    call vcp(r0prime,r_prv,ndof)
 
     ! Start iterating!!!
     niters = 1
     call cpu_time(start);
-    DO WHILE(niters<max_iters)
+    loop: DO WHILE(niters<max_iters)
 
-        rho = vvdot(r,r_prv,ndof)
+        rho = vvdot(r0prime,r_prv,ndof)
         
         beta = (rho/rho_prv)*(alpha/w_prv)
         
@@ -290,7 +299,7 @@ PROGRAM HW3problem6
 
         call A%SMVM(p,v)
 
-        alpha = rho/vvdot(r,v,ndof)
+        alpha = rho/vvdot(r0prime,v,ndof)
 
         call svp(alpha,p,dummy,ndof)
         call vva(x_prv,dummy,h,ndof)
@@ -300,7 +309,7 @@ PROGRAM HW3problem6
         res(niters) = L2norm(dummy,ndof)
         if(res(niters) < tolerance) then
             call vcp(h,x,ndof)
-            exit
+            exit loop
         end if
 
         call svp(DBLE(-alpha),v,dummy,ndof)
@@ -317,7 +326,7 @@ PROGRAM HW3problem6
         call residual(A,x,b,dummy,ndof)
         res(niters) = L2norm(dummy,ndof)
         if(res(niters) < tolerance) then
-            exit
+            exit loop
         end if
 
         call svp(-w,t,dummy,ndof)
@@ -333,12 +342,17 @@ PROGRAM HW3problem6
             v_prv(i) = v(i)
         END DO
         niters = niters + 1
-    END DO
+    END DO loop
     call cpu_time(stop);
-    
+    WRITE(*,*) "Center value: ", x(indexer(m/2,n/2,n))
     WRITE(*,*) "Iteration count: ",niters
     WRITE(*,*) "Average time per iteration (ms): ", (stop-start)/DBLE(niters)*1000
     WRITE(*,*) "Residual: ", res(niters)
+
+    DO i=0,niters
+        WRITE(out_unit,"(E15.5)") res(i)
+    END DO
     
+    close(out_unit)
 END PROGRAM HW3problem6
 

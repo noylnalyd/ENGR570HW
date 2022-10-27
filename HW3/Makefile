@@ -4,3 +4,6 @@ qr: mm_io.f90 HW3problem1.f90
 laplace: HW3problem2.f90
 	gfortran -c HW3problem2.f90
 	gfortran -o laplace.exe HW3problem2.o
+stab: HW3problem6.f90
+	gfortran -c HW3problem6.f90 -g
+	gfortran -o bicgstab.exe HW3problem6.o -g
